@@ -14,7 +14,7 @@ body{font-family:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",
 h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
 .sub{color:#5E5A74;margin-bottom:14px}
 .tabs{display:flex;gap:8px;margin:14px 0 6px}
-.tabs .t{flex:1;margin:0;padding:11px;border-radius:999px;background:transparent;border:1.5px solid #E4E0EE;color:#1F1B33;font-size:15px}
+.tabs .t{flex:1;margin:0;padding:11px 6px;border-radius:999px;background:transparent;border:1.5px solid #E4E0EE;color:#1F1B33;font-size:14px}
 .tabs .t.on{background:#1F1B33;border-color:#1F1B33;color:#fff}
 label.f,.f{display:block;font-size:14px;font-weight:700;color:#5E5A74;margin-top:14px}
 input[type=text],input[type=password],input[type=time],textarea{width:100%;margin-top:6px;padding:12px 14px;border:1.5px solid #E4E0EE;border-radius:12px;background:#fff;font:inherit;font-size:16px;color:inherit}
@@ -40,6 +40,16 @@ button:disabled{opacity:.6}
 #out.ok{background:#DDF1F0;color:#0F7F7E}
 #out.err{background:#F9DCE6;color:#BA2F5C}
 .hint{font-size:13px;color:#5E5A74;margin-top:10px}
+.chk{display:flex;gap:10px;align-items:center;margin-top:14px;padding:11px 12px;background:#fff;border-radius:12px;font-weight:650;font-size:15px}
+.chk input{width:20px;height:20px;margin:0;flex:none}
+.th{display:block;width:100%;text-align:left;margin:0 0 6px;padding:10px 12px;background:#fff;border:0;border-radius:12px;color:#1F1B33;font-weight:400;font-size:15px}
+.th b{display:block}
+.th small{color:#5E5A74;font-size:13px;display:block}
+.th .w{display:inline-block;background:#BA2F5C;color:#fff;border-radius:999px;padding:1px 8px;font-size:12px;font-weight:800;margin-left:6px}
+.bub{max-width:88%;padding:9px 12px;border-radius:16px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word;font-size:15px}
+.bub.u{background:#fff;border:1.5px solid #E4E0EE;margin-right:auto}
+.bub.a{background:#DDF1F0;margin-left:auto}
+.bub small{display:block;color:#5E5A74;font-size:12px;margin-top:3px}
 :focus-visible{outline:3px solid #6552CF;outline-offset:2px}
 </style>
 </head>
@@ -49,7 +59,8 @@ button:disabled{opacity:.6}
 <label class="f">Şifre<input id="secret" type="password" autocomplete="current-password"></label>
 <div class="tabs">
   <button class="t on" data-t="ann">Duyuru</button>
-  <button class="t" data-t="asg">Hatırlatıcı ata</button>
+  <button class="t" data-t="asg">Hatırlatıcı</button>
+  <button class="t" data-t="inb">Mesajlar</button>
 </div>
 
 <section id="p-ann">
@@ -61,6 +72,7 @@ button:disabled{opacity:.6}
   <div id="people" class="people"></div>
   <label class="f">Başlık<input id="title" type="text" maxlength="80" placeholder="Örn. Yeni sürüm"></label>
   <label class="f">Mesaj<textarea id="body" maxlength="300" placeholder="Kısa ve net yaz"></textarea></label>
+  <label class="chk"><input type="checkbox" id="imp">Önemli: 3 dk içinde açılmazsa bir kez daha gönder</label>
   <button id="send">Gönder</button>
   <button id="stats" class="ghost">Kaç kişi kayıtlı?</button>
 </section>
@@ -77,6 +89,20 @@ button:disabled{opacity:.6}
   <button id="asgBtn">Ata</button>
   <button id="showAsg" class="ghost">Atananları göster</button>
   <div id="assigned" style="margin-top:12px"></div>
+</section>
+
+<section id="p-inb" style="display:none">
+  <p class="hint">Kullanıcıların "Bize ulaşın" bölümünden yazdığı mesajlar. Cevap yazınca kişiye "Talebinize yanıt geldi" bildirimi gider.</p>
+  <button id="refInbox" class="ghost" style="margin-top:6px">Gelen kutusunu yenile</button>
+  <div id="threads" style="margin-top:12px"></div>
+  <div id="conv" style="display:none">
+    <div class="f" id="convName"></div>
+    <div id="convMsgs" style="margin-top:8px"></div>
+    <label class="f">Cevabın<textarea id="rtext" maxlength="500" placeholder="Cevabını yaz"></textarea></label>
+    <button id="replyBtn">Cevapla</button>
+    <button id="delThread" class="ghost">Yazışmayı sil</button>
+    <button id="backList" class="ghost">Listeye dön</button>
+  </div>
 </section>
 
 <div id="out" role="status"></div>
@@ -117,7 +143,7 @@ async function loadPeople(box){
 
 /* sekmeler */
 function setTab(t){
-  ['ann','asg'].forEach(x=>{$('p-'+x).style.display=x===t?'block':'none';});
+  ['ann','asg','inb'].forEach(x=>{$('p-'+x).style.display=x===t?'block':'none';});
   document.querySelectorAll('.tabs .t').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   $('out').style.display='none';
 }
@@ -132,7 +158,7 @@ document.querySelectorAll('input[name=to]').forEach(r=>r.onchange=async()=>{
 $('send').onclick=async()=>{
   const btn=$('send'); $('out').style.display='none';
   if(!$('secret').value||!$('title').value.trim()||!$('body').value.trim()) return show('err','Şifre, başlık ve mesajı doldur.');
-  const payload={title:$('title').value,body:$('body').value}; let ask='Bildirimi açan herkese gidecek. Göndereyim mi?';
+  const payload={title:$('title').value,body:$('body').value,important:$('imp').checked}; let ask='Bildirimi açan herkese gidecek. Göndereyim mi?';
   if(mode()==='sel'){
     const ids=[...document.querySelectorAll('#people input:checked')].map(i=>i.value);
     if(!ids.length) return show('err','En az bir kişi seç.');
@@ -200,6 +226,51 @@ $('asgBtn').onclick=async()=>{
     $('atext').value=''; await showAssigned();
   }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
   btn.disabled=false; btn.textContent='Ata';
+};
+
+/* ---- Mesajlar (gelen kutusu) ---- */
+let curPid=null;
+const tfmt=ts=>new Date(ts).toLocaleString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+async function loadThreads(){
+  const box=$('threads'); box.textContent='';
+  $('conv').style.display='none'; box.style.display='block';
+  const d=await api('/api/push-inbox',{action:'list'});
+  if(!d.items.length){const p=document.createElement('p');p.className='sub';p.textContent='Henüz mesaj yok.';box.appendChild(p);return;}
+  d.items.forEach(it=>{
+    const b=document.createElement('button'); b.type='button'; b.className='th';
+    const n=document.createElement('b'); n.textContent=it.name||'İsimsiz';
+    if(it.waiting){const w=document.createElement('span');w.className='w';w.textContent='Cevap bekliyor';n.appendChild(w);}
+    const sm=document.createElement('small'); sm.textContent=(it.last.from==='a'?'Sen: ':'')+it.last.text+' ('+tfmt(it.last.ts)+')';
+    b.append(n,sm); b.onclick=()=>openThread(it.pid).catch(e=>show('err',e.message)); box.appendChild(b);
+  });
+}
+async function openThread(pid){
+  curPid=pid; $('out').style.display='none';
+  const d=await api('/api/push-inbox',{action:'thread',pid});
+  $('threads').style.display='none'; $('conv').style.display='block';
+  $('convName').textContent=d.name||'İsimsiz';
+  const box=$('convMsgs'); box.textContent='';
+  d.msgs.forEach(m=>{
+    const el=document.createElement('div'); el.className='bub '+m.from; el.textContent=m.text;
+    const sm=document.createElement('small'); sm.textContent=(m.from==='a'?'Sen, ':'')+tfmt(m.ts); el.appendChild(sm); box.appendChild(el);
+  });
+  $('rtext').value='';
+}
+$('refInbox').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz'); await loadThreads(); }catch(e){show('err',e.message);} };
+$('backList').onclick=async()=>{ try{await loadThreads();}catch(e){show('err',e.message);} };
+$('replyBtn').onclick=async()=>{
+  const text=$('rtext').value.trim(); if(!text) return show('err','Cevabı yaz.');
+  const btn=$('replyBtn'); btn.disabled=true; btn.textContent='Gönderiliyor...';
+  try{
+    const d=await api('/api/push-inbox',{action:'reply',pid:curPid,text});
+    show('ok',d.notified?'Cevap gönderildi, kişiye bildirim gitti.':'Cevap kaydedildi (kişiye bildirim gönderilemedi, uygulamayı açınca görür).');
+    await openThread(curPid);
+  }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
+  btn.disabled=false; btn.textContent='Cevapla';
+};
+$('delThread').onclick=async()=>{
+  if(!confirm('Bu yazışma silinsin mi?')) return;
+  try{await api('/api/push-inbox',{action:'del',pid:curPid}); await loadThreads(); show('ok','Yazışma silindi.');}catch(e){show('err',e.message);}
 };
 </script>
 </body>

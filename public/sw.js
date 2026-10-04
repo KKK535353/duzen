@@ -10,15 +10,18 @@ self.addEventListener('push', e => {
     renotify: true,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    data: { url: '/' }
+    data: { url: d.url || '/' }
   }));
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
   e.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const c of all) { if ('focus' in c) return c.focus(); }
-    return self.clients.openWindow('/');
+    for (const c of all) {
+      if ('focus' in c) { await c.focus(); c.postMessage({ type: 'nav', url }); return; }
+    }
+    return self.clients.openWindow(url);
   })());
 });

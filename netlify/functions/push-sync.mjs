@@ -47,6 +47,10 @@ export default async (req) => {
     days: (Array.isArray(r.days) ? r.days : []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6),
   })).filter((r) => r.id && r.text && r.time && r.days.length);
 
+  const snz = (Array.isArray(b.snz) ? b.snz : []).slice(0, 30)
+    .map((z) => ({ slot: str(z && z.slot, 80), until: Number(z && z.until) }))
+    .filter((z) => z.slot && Number.isFinite(z.until));
+
   const done = (Array.isArray(b.done) ? b.done : []).slice(0, 300).map((x) => str(x, 80));
 
   const rec = {
@@ -56,6 +60,7 @@ export default async (req) => {
     tz: str(b.tz, 60) || "Europe/Istanbul",
     meds,
     rem: b.rem !== undefined ? rem : ((old && old.rem) || []),
+    snz: b.snz !== undefined ? snz : ((old && old.snz) || []),
     done,
     sent: (old && old.sent) || {},
     updated: Date.now(),

@@ -74,6 +74,7 @@ export default async (req) => {
           title: "Düzen",
           body: `Senin için günlük hatırlatıcı ayarlandı: ${text} (${time}, ${dayTxt}). İstersen Ayarlar'dan kapatabilirsin.`,
           tag: "assigned-" + Date.now(),
+          url: `/?t=${encodeURIComponent("Düzen")}&b=${encodeURIComponent(`Senin için günlük hatırlatıcı ayarlandı: ${text} (${time}, ${dayTxt}). İstersen Ayarlar'dan kapatabilirsin.`)}`,
         }), { TTL: 3600 });
         notified++;
       } catch (e) {

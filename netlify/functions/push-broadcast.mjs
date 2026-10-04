@@ -30,7 +30,10 @@ export default async (req) => {
     if (!want.size) return Response.json({ error: "Kimse seçilmedi" }, { status: 400 });
     blobs = blobs.filter(({ key }) => want.has(key.slice(4)));
   }
-  const payload = JSON.stringify({ title, body, tag: "duyuru-" + Date.now() });
+  const url = `/?t=${encodeURIComponent(title)}&b=${encodeURIComponent(body)}`;
+  const payload = JSON.stringify({ title, body, tag: "duyuru-" + Date.now(), url });
+  const important = b.important === true;
+  const okPids = [];
   let sent = 0, failed = 0, removed = 0;
 
   for (let i = 0; i < blobs.length; i += 20) {
@@ -40,13 +43,21 @@ export default async (req) => {
       try {
         await webpush.sendNotification(rec.sub, payload, { TTL: 3600 });
         sent++;
+        okPids.push(key.slice(4));
       } catch (e) {
         if (e.statusCode === 404 || e.statusCode === 410) { await s.delete(key); removed++; }
         else { failed++; console.error("broadcast error", e.statusCode, e.body); }
       }
     }));
   }
-  return Response.json({ ok: true, total: blobs.length, sent, failed, removed });
+  if (important && okPids.length) {
+    const now = Date.now();
+    const cur = (await s.get("pending", { type: "json" })) || { items: [] };
+    cur.items = cur.items.filter((i) => now - i.sentAt < 900000);
+    okPids.forEach((pid) => cur.items.push({ pid, title, body, url, sentAt: now }));
+    await s.setJSON("pending", cur);
+  }
+  return Response.json({ ok: true, total: blobs.length, sent, failed, removed, important });
 };
 
 export const config = { path: "/api/push-broadcast" };
