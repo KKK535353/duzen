@@ -2,6 +2,7 @@ import { store, vapid, webpush, localNow } from "../lib/push.mjs";
 
 const enc = encodeURIComponent;
 const infoUrl = (t, b) => `/?t=${enc(t)}&b=${enc(b)}`;
+const dayDiff = (a, b) => Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 864e5);
 
 export default async () => {
   const s = store();
@@ -43,7 +44,7 @@ export default async () => {
       return true;
     };
 
-    // 1) İlaç saatleri: ilk bildirim, 3 dk sonra (açılmadıysa ve işaretlenmediyse) bir kez daha
+    // 1) İlaç saatleri: ilk bildirim, 5 dk sonra (açılmadıysa ve işaretlenmediyse) bir kez daha
     for (const m of rec.meds || []) {
       if (gone) break;
       if (now.date < m.start || (m.end && now.date > m.end) || !m.days.includes(now.wd)) continue;
@@ -57,7 +58,11 @@ export default async () => {
         const snoozed = (rec.snz || []).some((z) => z.slot === slot && z.until > nowMs);
         let stage = 0;
         if (diff >= 0 && diff <= 2 && !done.has(slot)) stage = 1;
-        else if (diff >= 3 && diff <= 5 && !done.has(slot) && !opened && !snoozed) stage = 2;
+        else if (!done.has(slot) && !opened && !snoozed) {
+          // ilk bildirimden 5 dk sonra (ilk bildirim gittiyse ondan, gitmediyse planlanan saatten)
+          const since = t1 ? nowMs - t1 : null;
+          if (since !== null ? (since >= 300000 && since <= 540000) : (diff >= 5 && diff <= 7)) stage = 2;
+        }
         if (!stage || rec.sent[slot + "|" + stage]) continue;
 
         rec.sent[slot + "|" + stage] = nowMs;
@@ -132,6 +137,28 @@ export default async () => {
       if (age > 600000) continue;
       if ((rec.updated || 0) > it.sentAt) continue; // uygulamayı açmış
       const ok = await deliver({ title: "Tekrar: " + it.title, body: it.body, tag: "rep-" + it.sentAt, url: it.url });
+      if (!ok) gone = true;
+    }
+
+    // 5) Doktor randevuları: bir gün önce 18:00 ve 2 saat önce
+    for (const a of rec.appts || []) {
+      if (gone) break;
+      const [ah, am] = a.time.split(":").map(Number);
+      const dd = dayDiff(a.date, now.date);
+      const until = dd * 1440 + ah * 60 + am - now.min; // randevuya kalan dakika
+      const place = a.place ? `, ${a.place}` : "";
+      let msg = null, k = null;
+      if (a.d1 && dd === 1 && now.min >= 1080 && now.min <= 1082) {
+        msg = `Yarın saat ${a.time} doktor randevun var: ${a.title}${place}`;
+        k = `${now.date}|p:${a.id}|d1`;
+      } else if (a.h2 && until >= 118 && until <= 120) {
+        msg = `2 saat sonra doktor randevun var (${a.time}): ${a.title}${place}`;
+        k = `${now.date}|p:${a.id}|h2`;
+      }
+      if (!msg || rec.sent[k]) continue;
+      rec.sent[k] = nowMs;
+      changed = true;
+      const ok = await deliver({ title: "Doktor randevusu", body: msg, tag: k, url: infoUrl("Doktor randevusu", msg) });
       if (!ok) gone = true;
     }
 

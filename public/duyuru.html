@@ -13,8 +13,8 @@
 body{font-family:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;background:#F6F4FA;color:#1F1B33;padding:24px 20px 40px;max-width:480px;margin:0 auto;line-height:1.45}
 h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
 .sub{color:#5E5A74;margin-bottom:14px}
-.tabs{display:flex;gap:8px;margin:14px 0 6px}
-.tabs .t{flex:1;margin:0;padding:11px 6px;border-radius:999px;background:transparent;border:1.5px solid #E4E0EE;color:#1F1B33;font-size:14px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 6px}
+.tabs .t{flex:1 1 28%;margin:0;padding:11px 4px;border-radius:999px;background:transparent;border:1.5px solid #E4E0EE;color:#1F1B33;font-size:13.5px}
 .tabs .t.on{background:#1F1B33;border-color:#1F1B33;color:#fff}
 label.f,.f{display:block;font-size:14px;font-weight:700;color:#5E5A74;margin-top:14px}
 input[type=text],input[type=password],input[type=time],textarea{width:100%;margin-top:6px;padding:12px 14px;border:1.5px solid #E4E0EE;border-radius:12px;background:#fff;font:inherit;font-size:16px;color:inherit}
@@ -40,6 +40,17 @@ button:disabled{opacity:.6}
 #out.ok{background:#DDF1F0;color:#0F7F7E}
 #out.err{background:#F9DCE6;color:#BA2F5C}
 .hint{font-size:13px;color:#5E5A74;margin-top:10px}
+.sum{display:flex;gap:10px;margin-top:12px}
+.sum div{flex:1;background:#fff;border-radius:12px;padding:10px 12px}
+.sum b{display:block;font-size:20px}
+.sum span{font-size:12.5px;color:#5E5A74}
+.row{background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:6px}
+.row b{display:block}
+.row small{display:block;color:#5E5A74;font-size:13px}
+.bar{height:8px;border-radius:99px;background:#F9DCE6;margin:6px 0 4px;overflow:hidden}
+.bar i{display:block;height:100%;background:#2F9E5F}
+.row .del{margin:8px 0 0;width:auto;padding:6px 14px;font-size:13px;background:transparent;border:1.5px solid #E7B9B5;color:#B3261E}
+.h3{font-size:15px;font-weight:700;color:#5E5A74;margin:18px 0 8px}
 .chk{display:flex;gap:10px;align-items:center;margin-top:14px;padding:11px 12px;background:#fff;border-radius:12px;font-weight:650;font-size:15px}
 .chk input{width:20px;height:20px;margin:0;flex:none}
 .th{display:block;width:100%;text-align:left;margin:0 0 6px;padding:10px 12px;background:#fff;border:0;border-radius:12px;color:#1F1B33;font-weight:400;font-size:15px}
@@ -61,6 +72,8 @@ button:disabled{opacity:.6}
   <button class="t on" data-t="ann">Duyuru</button>
   <button class="t" data-t="asg">Hatırlatıcı</button>
   <button class="t" data-t="inb">Mesajlar</button>
+  <button class="t" data-t="act">Etkinlik</button>
+  <button class="t" data-t="med">İlaçlar</button>
 </div>
 
 <section id="p-ann">
@@ -105,6 +118,27 @@ button:disabled{opacity:.6}
   </div>
 </section>
 
+<section id="p-act" style="display:none">
+  <p class="hint">Kim uygulamayı açtı, kim bildirime dokundu. Yalnızca açılış zamanı ve sayıları tutulur, kişinin ilaç ya da sağlık verisi görünmez.</p>
+  <button id="refAct" class="ghost" style="margin-top:6px">Yenile</button>
+  <div id="actSum" class="sum" style="display:none"></div>
+  <div class="h3" id="bcHead" style="display:none">Son duyurular</div>
+  <div id="bcList"></div>
+  <div class="h3" id="ppHead" style="display:none">Kişiler</div>
+  <div id="ppList"></div>
+</section>
+
+<section id="p-med" style="display:none">
+  <p class="hint">Yalnızca ilaç listesini paylaşmayı Ayarlar'dan kendisi açan kişiler burada görünür. Paylaşmayanların ilaç bilgisi sunucudan bu panele hiç gelmez.</p>
+  <button id="refMed" class="ghost" style="margin-top:6px">Yenile</button>
+  <div class="to" id="medView" style="display:none;margin-top:10px">
+    <label><input type="radio" name="mv" value="person" checked>Kişiye göre</label>
+    <label><input type="radio" name="mv" value="hour">Saate göre</label>
+  </div>
+  <div id="medSum" class="hint"></div>
+  <div id="medList" style="margin-top:8px"></div>
+</section>
+
 <div id="out" role="status"></div>
 <script>
 const $=id=>document.getElementById(id);
@@ -143,7 +177,7 @@ async function loadPeople(box){
 
 /* sekmeler */
 function setTab(t){
-  ['ann','asg','inb'].forEach(x=>{$('p-'+x).style.display=x===t?'block':'none';});
+  ['ann','asg','inb','act','med'].forEach(x=>{$('p-'+x).style.display=x===t?'block':'none';});
   document.querySelectorAll('.tabs .t').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   $('out').style.display='none';
 }
@@ -272,6 +306,88 @@ $('delThread').onclick=async()=>{
   if(!confirm('Bu yazışma silinsin mi?')) return;
   try{await api('/api/push-inbox',{action:'del',pid:curPid}); await loadThreads(); show('ok','Yazışma silindi.');}catch(e){show('err',e.message);}
 };
+
+/* ---- Etkinlik ---- */
+function ago2(ts){
+  if(!ts) return 'hiç';
+  const m=Math.max(0,Math.round((Date.now()-ts)/60000));
+  if(m<1) return 'az önce';
+  if(m<60) return m+' dk önce';
+  const h=Math.round(m/60); if(h<48) return h+' sa önce';
+  return Math.round(h/24)+' gün önce';
+}
+function mk(tag,cls,txt){const e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e;}
+async function loadActivity(){
+  const d=await api('/api/push-activity',{});
+  const sum=$('actSum'); sum.textContent=''; sum.style.display='flex';
+  [['openedToday','Bugün açan'],['opened7','7 günde açan'],['notifToday','Bugün bildirime dokunan']].forEach(([k,l])=>{
+    const c=mk('div'); c.append(mk('b',null,String(d.totals[k])),mk('span',null,l)); sum.appendChild(c);
+  });
+  const bl=$('bcList'); bl.textContent=''; $('bcHead').style.display='block';
+  if(!d.broadcasts.length) bl.appendChild(mk('p','sub','Henüz duyuru gönderilmedi.'));
+  d.broadcasts.forEach(x=>{
+    const r=mk('div','row'); const pct=x.sent?Math.round(x.opened/x.sent*100):0;
+    r.appendChild(mk('b',null,x.title+(x.important?' (önemli)':'')));
+    const bar=mk('div','bar'); const i=mk('i'); i.style.width=pct+'%'; bar.appendChild(i); r.appendChild(bar);
+    r.appendChild(mk('small',null,x.sent+' kişiye gitti, '+x.opened+' kişi açtı (%'+pct+'), '+ago2(x.sentAt)));
+    if(x.notOpenedNames.length) r.appendChild(mk('small',null,'Açmayanlar: '+x.notOpenedNames.join(', ')));
+    if(x.openedNames.length) r.appendChild(mk('small',null,'Açanlar: '+x.openedNames.join(', ')));
+    bl.appendChild(r);
+  });
+  const pl=$('ppList'); pl.textContent=''; $('ppHead').style.display='block';
+  if(!d.people.length) pl.appendChild(mk('p','sub','Kayıtlı kimse yok.'));
+  d.people.forEach(p=>{
+    const r=mk('div','row'); r.appendChild(mk('b',null,p.name||'İsimsiz'));
+    r.appendChild(mk('small',null,'Son açılış: '+ago2(p.lastOpen||p.updated)));
+    r.appendChild(mk('small',null,'Bugün '+p.opensToday+' açılış ('+p.notifsToday+' bildirimden), 7 günde '+p.opens7+' açılış ('+p.notifs7+' bildirimden)'));
+    if(p.lastNotif) r.appendChild(mk('small',null,'Son bildirime dokunma: '+p.lastNotif.kind+', '+ago2(p.lastNotif.ts)));
+    const del=mk('button','del','Sil'); del.type='button';
+    del.onclick=async()=>{
+      const who=p.name||'İsimsiz';
+      if(!confirm(who+' silinsin mi?\n\nSunucudaki tüm kaydı silinir: ilaç listesi, hatırlatıcılar, yazışmalar. Kişinin telefonunda bildirimler kapanır. İsterse uygulamadan tekrar açabilir.')) return;
+      try{ await api('/api/push-users',{action:'del',pid:p.id}); await loadActivity(); show('ok',who+' silindi.'); }catch(e){show('err',e.message);}
+    };
+    r.appendChild(del);
+    pl.appendChild(r);
+  });
+}
+$('refAct').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz'); await loadActivity(); }catch(e){show('err',e.message);} };
+
+/* ---- İlaçlar (paylaşanlar) ---- */
+let medData=null;
+const medLine=m=>m.name+(m.dose?' '+m.dose:'')+', '+(m.times.join(', ')||'saat yok')+', '+dayTxt(m.days)+(m.end?' (bitiş '+m.end+')':'');
+function renderMeds(){
+  const box=$('medList'); box.textContent='';
+  if(!medData) return;
+  const view=document.querySelector('input[name=mv]:checked').value;
+  if(!medData.people.length){ box.appendChild(mk('p','sub','Henüz ilaç listesini paylaşan kimse yok.')); return; }
+  if(view==='person'){
+    medData.people.forEach(p=>{
+      const r=mk('div','row'); r.appendChild(mk('b',null,p.name));
+      if(!p.meds.length) r.appendChild(mk('small',null,'Kayıtlı ilaç yok'));
+      p.meds.forEach(m=>r.appendChild(mk('small',null,medLine(m))));
+      box.appendChild(r);
+    });
+  }else{
+    const ent=[];
+    medData.people.forEach(p=>p.meds.forEach(m=>m.times.forEach(t=>ent.push({t,who:p.name,m}))));
+    ent.sort((a,c)=>a.t.localeCompare(c.t)||a.who.localeCompare(c.who,'tr'));
+    if(!ent.length){ box.appendChild(mk('p','sub','Saatli ilaç yok.')); return; }
+    let cur=null,row=null;
+    ent.forEach(e=>{
+      if(e.t!==cur){ cur=e.t; row=mk('div','row'); row.appendChild(mk('b',null,e.t)); box.appendChild(row); }
+      row.appendChild(mk('small',null,e.who+': '+e.m.name+(e.m.dose?' '+e.m.dose:'')+', '+dayTxt(e.m.days)));
+    });
+  }
+}
+async function loadMeds(){
+  medData=await api('/api/push-meds',{});
+  $('medView').style.display='flex';
+  $('medSum').textContent=medData.sharing+' kişi ilaç listesini paylaşıyor, '+medData.notSharing+' kişi paylaşmıyor.';
+  renderMeds();
+}
+$('refMed').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz'); await loadMeds(); }catch(e){show('err',e.message);} };
+document.querySelectorAll('input[name=mv]').forEach(r=>r.onchange=renderMeds);
 </script>
 </body>
 </html>

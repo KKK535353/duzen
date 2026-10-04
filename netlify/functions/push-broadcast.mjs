@@ -30,7 +30,8 @@ export default async (req) => {
     if (!want.size) return Response.json({ error: "Kimse seçilmedi" }, { status: 400 });
     blobs = blobs.filter(({ key }) => want.has(key.slice(4)));
   }
-  const url = `/?t=${encodeURIComponent(title)}&b=${encodeURIComponent(body)}`;
+  const bid = "b" + Date.now().toString(36);
+  const url = `/?t=${encodeURIComponent(title)}&b=${encodeURIComponent(body)}&n=${bid}`;
   const payload = JSON.stringify({ title, body, tag: "duyuru-" + Date.now(), url });
   const important = b.important === true;
   const okPids = [];
@@ -49,6 +50,13 @@ export default async (req) => {
         else { failed++; console.error("broadcast error", e.statusCode, e.body); }
       }
     }));
+  }
+  if (okPids.length) {   // duyuru kaydı: kimlere gitti, kimler açtı
+    await s.setJSON("bc/" + bid, { id: bid, title, body: body.slice(0, 100), sentAt: Date.now(), important, to: okPids, opened: {} });
+    try {
+      const all = (await s.list({ prefix: "bc/" })).blobs.map((x) => x.key).sort();
+      for (const k of all.slice(0, Math.max(0, all.length - 30))) await s.delete(k);
+    } catch {}
   }
   if (important && okPids.length) {
     const now = Date.now();

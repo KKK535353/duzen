@@ -1,4 +1,4 @@
-import { store, idOf, ALLOWED } from "../lib/push.mjs";
+import { store, idOf, ALLOWED, localNow } from "../lib/push.mjs";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -24,6 +24,8 @@ export default async (req) => {
     return Response.json({ ok: true });
   }
 
+  if (await s.get("removed/" + id, { type: "json" })) return Response.json({ removed: true }, { status: 403 });
+
   const old = await s.get("sub/" + id, { type: "json" });
   if (!old) {
     const { blobs } = await s.list({ prefix: "sub/" });
@@ -47,9 +49,40 @@ export default async (req) => {
     days: (Array.isArray(r.days) ? r.days : []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6),
   })).filter((r) => r.id && r.text && r.time && r.days.length);
 
+  const appts = (Array.isArray(b.appts) ? b.appts : []).slice(0, 20).map((a) => ({
+    id: str(a && a.id, 40),
+    title: str(a && a.title, 80).trim(),
+    place: str(a && a.place, 80).trim(),
+    date: DATE.test(a && a.date) ? a.date : "",
+    time: TIME.test(a && a.time) ? a.time : "",
+    d1: !!(a && a.d1),
+    h2: !!(a && a.h2),
+  })).filter((a) => a.id && a.title && a.date && a.time);
+
   const snz = (Array.isArray(b.snz) ? b.snz : []).slice(0, 30)
     .map((z) => ({ slot: str(z && z.slot, 80), until: Number(z && z.until) }))
     .filter((z) => z.slot && Number.isFinite(z.until));
+
+  // Etkinlik: uygulamayı açma ve bildirime dokunma sayıları (içerik tutulmaz)
+  const tzName = str(b.tz, 60) || "Europe/Istanbul";
+  const evs = (Array.isArray(b.evs) ? b.evs : []).slice(0, 5).map((e) => ({
+    type: e && e.type === "notif" ? "notif" : "open",
+    kind: str(e && e.kind, 20),
+    ref: /^b[0-9a-z]{4,14}$/.test(String((e && e.ref) || "")) ? e.ref : "",
+  }));
+  const act = { lastOpen: 0, lastNotif: null, days: {}, ...((old && old.act) || {}) };
+  act.days = { ...(act.days || {}) };
+  if (evs.length) {
+    const day = localNow(tzName).date, tsNow = Date.now();
+    for (const e of evs) {
+      const d = (act.days[day] = act.days[day] || { o: 0, n: 0 });
+      d.o++;
+      act.lastOpen = tsNow;
+      if (e.type === "notif") { d.n++; act.lastNotif = { ts: tsNow, kind: e.kind || "bildirim" }; }
+    }
+    const keys = Object.keys(act.days).sort();
+    while (keys.length > 14) delete act.days[keys.shift()];
+  }
 
   const done = (Array.isArray(b.done) ? b.done : []).slice(0, 300).map((x) => str(x, 80));
 
@@ -60,12 +93,21 @@ export default async (req) => {
     tz: str(b.tz, 60) || "Europe/Istanbul",
     meds,
     rem: b.rem !== undefined ? rem : ((old && old.rem) || []),
+    appts: b.appts !== undefined ? appts : ((old && old.appts) || []),
     snz: b.snz !== undefined ? snz : ((old && old.snz) || []),
+    shareMeds: b.shareMeds !== undefined ? b.shareMeds === true : !!(old && old.shareMeds),
     done,
+    act,
     sent: (old && old.sent) || {},
     updated: Date.now(),
   };
   await s.setJSON("sub/" + id, rec);
+  // Duyuruyu bildirimden açtıysa duyurunun "açtı" listesine ekle
+  for (const e of evs) {
+    if (e.type !== "notif" || !e.ref) continue;
+    const bc = await s.get("bc/" + e.ref, { type: "json" });
+    if (bc && bc.opened && !bc.opened[id]) { bc.opened[id] = Date.now(); await s.setJSON("bc/" + e.ref, bc); }
+  }
   return Response.json({ ok: true, meds: meds.length });
 };
 
