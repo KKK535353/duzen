@@ -74,6 +74,7 @@ button:disabled{opacity:.6}
   <button class="t" data-t="inb">Mesajlar</button>
   <button class="t" data-t="act">Etkinlik</button>
   <button class="t" data-t="med">İlaçlar</button>
+  <button class="t" data-t="wx">Hava durumu</button>
 </div>
 
 <section id="p-ann">
@@ -139,6 +140,20 @@ button:disabled{opacity:.6}
   <div id="medList" style="margin-top:8px"></div>
 </section>
 
+<section id="p-wx" style="display:none">
+  <p class="hint">Her sabah 10:00'da İstanbul hava durumu, seçtiğin kişilere bildirim olarak gider. Veri Meteoroloji Genel Müdürlüğü'nden alınır, ulaşılamazsa Open-Meteo kullanılır ve mesajda kaynak yazar. Seçilen kişiye haber verilir, Ayarlar'dan kapatabilir.</p>
+  <button id="wxLoad" class="ghost" style="margin-top:6px">Kişileri getir</button>
+  <label class="chk" id="wxOnRow" style="display:none"><input type="checkbox" id="wxOn">Her sabah 10:00 gönderimi açık</label>
+  <div id="wxPeople" class="people"></div>
+  <div id="wxBtns" style="display:none">
+    <button id="wxSave">Kaydet</button>
+    <button id="wxPrev" class="ghost">Önizleme (kimseye göndermeden)</button>
+    <button id="wxNow" class="ghost">İşaretlilere şimdi gönder (deneme)</button>
+  </div>
+  <div id="wxLast" class="hint"></div>
+  <div id="wxMsg" class="row" style="display:none;white-space:pre-wrap;margin-top:10px"></div>
+</section>
+
 <div id="out" role="status"></div>
 <script>
 const $=id=>document.getElementById(id);
@@ -177,7 +192,7 @@ async function loadPeople(box){
 
 /* sekmeler */
 function setTab(t){
-  ['ann','asg','inb','act','med'].forEach(x=>{$('p-'+x).style.display=x===t?'block':'none';});
+  ['ann','asg','inb','act','med','wx'].forEach(x=>{$('p-'+x).style.display=x===t?'block':'none';});
   document.querySelectorAll('.tabs .t').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   $('out').style.display='none';
 }
@@ -388,6 +403,48 @@ async function loadMeds(){
 }
 $('refMed').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz'); await loadMeds(); }catch(e){show('err',e.message);} };
 document.querySelectorAll('input[name=mv]').forEach(r=>r.onchange=renderMeds);
+
+/* ---- Hava durumu bildirimi ---- */
+function wxLastText(l){
+  if(!l) return 'Henüz gönderim yok.';
+  const when=l.at?tfmt(l.at):'';
+  if(l.ok) return 'Son gönderim: '+when+', '+l.sent+' kişi, kaynak '+l.source+(l.note?' (MGM alınamadı, yedek kullanıldı)':'')+(l.failed?', '+l.failed+' hata':'');
+  return 'Son deneme başarısız ('+when+'): '+(l.error||'bilinmeyen hata')+'. 5 dakika sonra tekrar denenir.';
+}
+async function wxLoad(){
+  const d=await api('/api/weather',{action:'get'});
+  const box=$('wxPeople'); box.textContent=''; box.style.display='block';
+  $('wxOnRow').style.display='flex'; $('wxBtns').style.display='block'; $('wxOn').checked=!!d.enabled;
+  if(!d.people.length){ box.appendChild(mk('p','sub','Kayıtlı kimse yok.')); }
+  d.people.forEach(p=>{
+    const l=document.createElement('label'); l.className='p';
+    const c=document.createElement('input'); c.type='checkbox'; c.value=p.id; c.checked=!!p.selected;
+    const s=document.createElement('span'); s.append(mk('b',null,p.name||'İsimsiz'));
+    if(p.selected&&p.off) s.append(mk('small',null,'Kendisi kapattı'));
+    l.append(c,s); box.appendChild(l);
+  });
+  $('wxLast').textContent=wxLastText(d.last);
+}
+const wxIds=()=>[...document.querySelectorAll('#wxPeople input:checked')].map(i=>i.value);
+$('wxLoad').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz'); await wxLoad(); }catch(e){show('err',e.message);} };
+$('wxSave').onclick=async()=>{
+  $('out').style.display='none'; const ids=wxIds();
+  if($('wxOn').checked&&!ids.length) return show('err','Gönderimi açmak için en az bir kişi seç.');
+  if(!confirm(ids.length+' kişi seçili, gönderim '+($('wxOn').checked?'AÇIK':'KAPALI')+'. Yeni eklenenlere haber verilecek. Kaydedeyim mi?')) return;
+  try{ const d=await api('/api/weather',{action:'save',ids,enabled:$('wxOn').checked}); show('ok','Kaydedildi: '+d.selected+' kişi'+(d.added?', '+d.added+' yeni kişiye haber verildi':'')+'.'); await wxLoad(); }catch(e){show('err',e.message);}
+};
+$('wxPrev').onclick=async()=>{
+  $('out').style.display='none';
+  try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz');
+    const d=await api('/api/weather',{action:'preview'}); const m=$('wxMsg'); m.style.display='block';
+    m.textContent=d.title+'\n'+d.body+'\n\n'+d.full+'\n\nKaynak: '+d.source+(d.note?' (MGM: '+d.note+')':'');
+  }catch(e){show('err',e.message);}
+};
+$('wxNow').onclick=async()=>{
+  $('out').style.display='none'; const ids=wxIds(); if(!ids.length) return show('err','En az bir kişi işaretle.');
+  if(!confirm(ids.length+' kişiye hava durumu şimdi gönderilecek (deneme). Bugünkü 10:00 bildirimi yine de ayrıca gider. Göndereyim mi?')) return;
+  try{ const d=await api('/api/weather',{action:'sendnow',ids}); show('ok','Gönderildi: '+d.sent+' kişi, kaynak '+d.source+(d.failed?', '+d.failed+' hata':'')+'.'); }catch(e){show('err',e.message);}
+};
 </script>
 </body>
 </html>

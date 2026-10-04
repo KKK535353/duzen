@@ -29,6 +29,8 @@ export default async (req) => {
       pend.items = pend.items.filter((i) => i.pid !== pid);
       await s.setJSON("pending", pend);
     }
+    const wcfg = await s.get("weather", { type: "json" });
+    if (wcfg && wcfg.recipients && wcfg.recipients[pid]) { delete wcfg.recipients[pid]; await s.setJSON("weather", wcfg); }
     // Telefon bir sonraki açılışta kendiliğinden yeniden kayıt olmasın diye işaret bırak
     await s.setJSON("removed/" + pid, { ts: Date.now() });
     return json({ ok: true });

@@ -15,12 +15,19 @@ export default async (req) => {
   if (!exists) return Response.json({ items: [] });
 
   const list = (await s.get("assigned/" + pid, { type: "json" })) || [];
+  const wcfg = (await s.get("weather", { type: "json" })) || {};
+  const wr = wcfg.recipients && wcfg.recipients[pid];
+  if (wr && b.weatherOff !== undefined) {
+    wr.off = b.weatherOff === true;
+    await s.setJSON("weather", wcfg);
+  }
   if (b.id !== undefined) {
     const r = list.find((x) => x.id === String(b.id));
     if (r) { r.off = !!b.off; await s.setJSON("assigned/" + pid, list); }
   }
   return Response.json({
     items: list.map(({ id, text, time, days, off }) => ({ id, text, time, days, off: !!off })),
+    weather: { selected: !!wr, off: !!(wr && wr.off) },
   });
 };
 

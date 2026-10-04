@@ -471,6 +471,8 @@ function renderSet(){
   const rems=S.reminders||[];
   const contactSection=`<h3>Bize ulaşın</h3>
   <div class="set row2"><div><b>Soru ya da isteğini yaz${contactUnread?`<span class="badge">${contactUnread}</span>`:''}</b><small>${contactUnread?'Yeni yanıt var':s.push?'Yanıt gelince bildirim alırsın':'Önce arka plan bildirimlerini aç'}</small></div><button class="btn teal sm" data-a="openContact">${contactUnread?'Yanıtı oku':'Yaz'}</button></div>`;
+  const wxSection=weatherCache.selected?`<h3>Hava durumu bildirimi</h3>
+  <div class="set row2"><div><b>İstanbul hava durumu</b><small>Her sabah 10:00'da, duyuru gönderen kişi senin için ayarladı. Kaynak: Meteoroloji Genel Müdürlüğü. İstersen kapatabilirsin.</small></div><button class="sw t ${weatherCache.off?'':'on'}" data-a="togWeather" role="switch" aria-checked="${!weatherCache.off}" aria-label="Hava durumu bildirimi"></button></div>`:'';
   const asgSection=assignedCache.length?`<h3>Senin için ayarlanmış</h3>
   <p class="fine" style="margin-top:0">Bu hatırlatıcıları senin için ayarlayan kişi ekledi. İstersen kapatabilirsin.</p>
   ${assignedCache.map(r=>`<div class="set row2"><div><b>${esc(r.text)}</b><small>${r.time}, ${dayTxt(r)}</small></div><button class="sw t ${r.off?'':'on'}" data-a="togAsg" data-id="${r.id}" role="switch" aria-checked="${!r.off}" aria-label="Aç ya da kapat"></button></div>`).join('')}`:'';
@@ -490,6 +492,7 @@ function renderSet(){
   <p class="fine">Açınca ilaç saati geldiğinde uygulama kapalı olsa da bildirim gelir, işaretlemezsen 10 dakika sonra bir kez daha hatırlatılır. iPhone'da bunun için uygulamayı ana ekrana ekleyip oradan açman gerekir.</p>
   ${remSection}
   ${asgSection}
+  ${wxSection}
   ${contactSection}
   <h3>Gizlilik</h3>
   <div class="set row2"><div><b>İlaç listemi paylaş</b><small>${s.push?'Açarsan ilaç adların, dozların ve saatlerin duyuru gönderen kişiye görünür. Kapatınca görünmez olur. Hatırlatma bildirimleri için bu bilgiler zaten sunucuda tutulur.':'Önce arka plan bildirimlerini aç.'}</small></div>${s.push?`<button class="sw t ${s.shareMeds?'on':''}" data-a="tgl" data-k="shareMeds" role="switch" aria-checked="${!!s.shareMeds}" aria-label="İlaç listemi paylaş"></button>`:''}</div>
@@ -711,18 +714,18 @@ function saveRem(){
 }
 
 /* ---------- bu kişiye panelden atanmış hatırlatıcılar ---------- */
-let assignedCache=[],contactMsgs=[],contactUnread=0;
+let assignedCache=[],weatherCache={selected:false,off:false},contactMsgs=[],contactUnread=0;
 async function assignedCall(extra){
   if(!PUSH_OK()||!S.settings.push) return null;
   try{
     const reg=await navigator.serviceWorker.ready, sub=await reg.pushManager.getSubscription(); if(!sub) return null;
     const r=await fetch('/api/push-assigned',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON(),...extra})});
-    if(!r.ok) return null; return (await r.json()).items||[];
+    if(!r.ok) return null; return await r.json();
   }catch(e){ return null; }
 }
 async function loadAssigned(){
-  const items=await assignedCall({});
-  if(items){ assignedCache=items; if(tab==='set'&&!(document.activeElement&&document.activeElement.tagName==='INPUT')) render(); }
+  const d=await assignedCall({});
+  if(d){ assignedCache=d.items||[]; weatherCache=d.weather||{selected:false,off:false}; if(tab==='set'&&!(document.activeElement&&document.activeElement.tagName==='INPUT')) render(); }
 }
 
 /* ---------- bildirime dokununca doğru ekranı aç ---------- */
@@ -887,7 +890,11 @@ document.addEventListener('click',e=>{
     case 'togAsg': {
       const r=assignedCache.find(x=>x.id===D.id); if(!r) break;
       r.off=!r.off; render();
-      assignedCall({id:r.id,off:r.off}).then(items=>{ if(items){assignedCache=items; if(tab==='set') render();} else toast('Kaydedilemedi, tekrar dene'); });
+      assignedCall({id:r.id,off:r.off}).then(d=>{ if(d){assignedCache=d.items||[]; if(d.weather) weatherCache=d.weather; if(tab==='set') render();} else toast('Kaydedilemedi, tekrar dene'); });
+      break; }
+    case 'togWeather': {
+      weatherCache.off=!weatherCache.off; render();
+      assignedCall({weatherOff:weatherCache.off}).then(d=>{ if(d){ if(d.weather) weatherCache=d.weather; if(tab==='set') render(); } else toast('Kaydedilemedi, tekrar dene'); });
       break; }
     case 'newAppt': adraft={id:null,title:'',date:t,time:'09:00',place:'',d1:true,h2:true}; delArm=''; openAppt(); break;
     case 'editAppt': { const a=(S.appts||[]).find(x=>x.id===D.id); if(!a) break; adraft={...a}; delArm=''; openAppt(); break; }
