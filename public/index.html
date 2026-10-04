@@ -405,7 +405,7 @@ function renderSet(){
   const pushStatus=s.push?'Açık. Uygulama kapalıyken de ilaç saatinde bildirim gelir':np==='denied'?'İzin kapalı. Telefon ayarlarından bu uygulamanın bildirimlerine izin ver':hasPush?'Kapalı':'Bu cihazda ya da bu açılışta kullanılamıyor. Uygulamayı ana ekrana ekleyip oradan aç (iOS 16.4 ve üstü)';
   const stepper=(k,v)=>`<div class="step"><button data-a="step" data-k="${k}" data-v="-1" aria-label="Azalt">−</button><b>${v} gün</b><button data-a="step" data-k="${k}" data-v="1" aria-label="Artır">+</button></div>`;
   return `<div class="head"><div><h1>Ayarlar</h1></div></div>
-  <div class="set"><label style="margin-top:0">Adın (isteğe bağlı)<input id="nm" value="${esc(s.name)}" placeholder="Karşılama için" autocomplete="off"></label></div>
+  <div class="set"><label style="margin-top:0">Adın (isteğe bağlı)<input id="nm" value="${esc(s.name)}" placeholder="Karşılama için" autocomplete="off"></label><small>Arka plan bildirimini açtıysan adın, duyuru gönderen kişiye görünür.</small></div>
   <div class="set row2"><div><b>Ortalama döngü uzunluğu</b><small>${s.auto?'Otomatik hesaplanıyor, kayıt yoksa bu değer kullanılır':'Elle ayarlandı'}</small></div>${stepper('cycleLen',s.cycleLen)}</div>
   <div class="set row2"><div><b>Otomatik hesapla</b><small>Kayıtlarından ortalama çıkarır</small></div><button class="sw ${s.auto?'on':''}" data-a="tgl" data-k="auto" role="switch" aria-checked="${s.auto}" aria-label="Otomatik hesapla"></button></div>
   <div class="set row2"><div><b>Regl süresi</b></div>${stepper('periodLen',s.periodLen)}</div>
@@ -532,7 +532,7 @@ async function doSync(){
     const t=today(),y=addDays(t,-1),done=[];
     [t,y].forEach(d=>Object.keys(S.log[d]||{}).forEach(k=>done.push(d+'|'+k)));
     const r=await fetch('/api/push-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      subscription:sub.toJSON(),tz:Intl.DateTimeFormat().resolvedOptions().timeZone,
+      subscription:sub.toJSON(),name:S.settings.name||'',tz:Intl.DateTimeFormat().resolvedOptions().timeZone,
       meds:S.meds.map(m=>({id:m.id,name:m.name,dose:m.dose,times:m.times,days:m.days,start:m.start,end:m.end})),done})});
     return r.ok;
   }catch(e){console.error(e);return false;}
@@ -568,6 +568,21 @@ async function testNotif(){
   catch(e){ try{ new Notification('Düzen',{body:'Bildirimler çalışıyor'}); }catch(_){ toast('Bildirim gösterilemedi'); } }
 }
 
+/* ---------- ilk açılışta isim sorma (en fazla 2 kez) ---------- */
+let nameAsked=false;
+function maybeAskName(){
+  if(nameAsked||S.settings.name||(S.nameAsk||0)>=2||alertOpen||$('#sheetwrap').classList.contains('open')) return;
+  nameAsked=true; S.nameAsk=(S.nameAsk||0)+1; persist();
+  $('#sheet').innerHTML=`<div class="grab"></div><h2>Adını yazar mısın?</h2><p class="sub" style="margin-top:6px">Duyuru gönderen kişi seni tanıyabilsin diye. Ad ya da takma ad yeter. Bildirimi açtıysan yalnızca adın ona görünür.</p><label>Adın<input id="ask-name" maxlength="40" autocomplete="off" placeholder="Örn. Ayşe"></label><div class="actions"><button class="btn ghost" data-a="nameSkip">Şimdi değil</button><button class="btn teal" data-a="nameSave">Kaydet</button></div>`;
+  $('#sheetwrap').classList.add('open');
+}
+function saveName(){
+  const v=($('#ask-name')||{}).value; const name=(v||'').trim().slice(0,40);
+  if(!name) return toast('Adını yaz ya da "Şimdi değil"e bas');
+  S.settings.name=name; persist(); closeSheet(); render(); toast('Teşekkürler, '+name);
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='ask-name') saveName(); });
+
 /* ---------- olaylar ---------- */
 document.addEventListener('click',e=>{
   if(e.target.id==='sheetwrap'){closeSheet();return;}
@@ -584,6 +599,8 @@ document.addEventListener('click',e=>{
     case 'newMed': draft={id:null,name:'',dose:'',times:['08:00'],days:[0,1,2,3,4,5,6],start:t,end:'',stock:'',note:''}; openSheet(); break;
     case 'editMed': { const m=S.meds.find(x=>x.id===D.id); draft={...m,times:[...m.times],days:[...m.days]}; delArm=''; openSheet(); break; }
     case 'closeSheet': closeSheet(); break;
+    case 'nameSave': saveName(); break;
+    case 'nameSkip': closeSheet(); break;
     case 'addTime': syncDraft(); draft.times.push('12:00'); openSheet(); break;
     case 'delTime': syncDraft(); draft.times.splice(+D.i,1); openSheet(); break;
     case 'togDay': { syncDraft(); const i=+D.i,k=draft.days.indexOf(i); k>=0?draft.days.splice(k,1):draft.days.push(i); openSheet(); break; }
@@ -633,7 +650,7 @@ document.addEventListener('visibilitychange',()=>{ if(!document.hidden) tick(); 
 (async function init(){
   const d=await store.load();
   if(d) S={...S,...d,settings:{...S.settings,...(d.settings||{})}};
-  render(); tick(); setInterval(tick,15000);
+  render(); tick(); setInterval(tick,15000); setTimeout(maybeAskName,700);
   if('serviceWorker' in navigator&&location.protocol==='https:'){ navigator.serviceWorker.register('/sw.js').catch(()=>{}); if(S.settings.push) pushSync(); }
 })();
 </script>

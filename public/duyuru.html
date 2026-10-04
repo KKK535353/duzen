@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Duyuru">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Duyuru gönder</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font-family:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;background:#F6F4FA;color:#1F1B33;padding:24px 20px 40px;max-width:480px;margin:0 auto;line-height:1.45}
+h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+.sub{color:#5E5A74;margin-bottom:18px}
+label.f{display:block;font-size:14px;font-weight:700;color:#5E5A74;margin-top:14px}
+input[type=text],input[type=password],textarea{width:100%;margin-top:6px;padding:12px 14px;border:1.5px solid #E4E0EE;border-radius:12px;background:#fff;font:inherit;font-size:16px;color:inherit}
+textarea{min-height:110px;resize:vertical}
+.to{display:flex;gap:10px;margin-top:6px}
+.to label{flex:1;display:flex;align-items:center;gap:8px;padding:11px 12px;border:1.5px solid #E4E0EE;border-radius:12px;background:#fff;font-weight:650;font-size:15px}
+.to input{width:18px;height:18px;margin:0}
+#people{margin-top:10px;display:none}
+.p{display:flex;gap:10px;align-items:center;padding:10px 12px;background:#fff;border-radius:12px;margin-bottom:6px}
+.p input{width:20px;height:20px;margin:0;flex:none}
+.p b{display:block}
+.p small{color:#5E5A74;font-size:13px}
+button{margin-top:20px;width:100%;border:0;border-radius:999px;padding:14px;font:inherit;font-weight:700;background:#0F7F7E;color:#fff;font-size:16px}
+button.ghost{background:transparent;border:1.5px solid #E4E0EE;color:#1F1B33;margin-top:10px}
+button:disabled{opacity:.6}
+#out{margin-top:16px;padding:12px 14px;border-radius:12px;display:none;font-weight:600}
+#out.ok{background:#DDF1F0;color:#0F7F7E}
+#out.err{background:#F9DCE6;color:#BA2F5C}
+:focus-visible{outline:3px solid #6552CF;outline-offset:2px}
+</style>
+</head>
+<body>
+<h1>Duyuru gönder</h1>
+<p class="sub">Bildirime izin verenlere gider.</p>
+<label class="f">Şifre<input id="secret" type="password" autocomplete="current-password"></label>
+<div class="f">Kime?</div>
+<div class="to">
+  <label><input type="radio" name="to" value="all" checked>Herkese</label>
+  <label><input type="radio" name="to" value="sel">Seçtiklerime</label>
+</div>
+<div id="people"></div>
+<label class="f">Başlık<input id="title" type="text" maxlength="80" placeholder="Örn. Yeni sürüm"></label>
+<label class="f">Mesaj<textarea id="body" maxlength="300" placeholder="Kısa ve net yaz"></textarea></label>
+<button id="send">Gönder</button>
+<button id="stats" class="ghost">Kaç kişi kayıtlı?</button>
+<div id="out" role="status"></div>
+<script>
+const $=id=>document.getElementById(id);
+const mode=()=>document.querySelector('input[name=to]:checked').value;
+function show(cls,txt){const o=$('out');o.className=cls;o.textContent=txt;o.style.display='block';}
+async function api(path,payload){
+  const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:$('secret').value,...payload})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error||('Hata '+r.status));
+  return d;
+}
+function ago(ts){
+  const m=Math.max(0,Math.round((Date.now()-ts)/60000));
+  if(m<60) return m+' dk önce';
+  const h=Math.round(m/60); if(h<48) return h+' sa önce';
+  return Math.round(h/24)+' gün önce';
+}
+function renderPeople(list){
+  const box=$('people'); box.textContent=''; box.style.display='block';
+  if(!list.length){const p=document.createElement('p');p.className='sub';p.textContent='Kayıtlı kimse yok.';box.appendChild(p);return;}
+  list.forEach(p=>{
+    const l=document.createElement('label'); l.className='p';
+    const c=document.createElement('input'); c.type='checkbox'; c.value=p.id;
+    const s=document.createElement('span');
+    const b=document.createElement('b'); b.textContent=p.name||'İsimsiz';
+    const sm=document.createElement('small'); sm.textContent='son aktif '+ago(p.updated)+', kod '+p.id.slice(0,4);
+    s.append(b,sm); l.append(c,s); box.appendChild(l);
+  });
+}
+async function loadPeople(){
+  if(!$('secret').value) throw new Error('Önce şifreyi yaz');
+  const d=await api('/api/push-stats',{list:true}); renderPeople(d.people||[]); return d;
+}
+document.querySelectorAll('input[name=to]').forEach(r=>r.onchange=async()=>{
+  $('out').style.display='none';
+  if(mode()==='all'){$('people').style.display='none';return;}
+  try{await loadPeople();}catch(e){show('err',e.message);document.querySelector('input[name=to][value=all]').checked=true;$('people').style.display='none';}
+});
+$('send').onclick=async()=>{
+  const btn=$('send'); $('out').style.display='none';
+  if(!$('secret').value||!$('title').value.trim()||!$('body').value.trim()) return show('err','Şifre, başlık ve mesajı doldur.');
+  const payload={title:$('title').value,body:$('body').value}; let ask='Bildirimi açan herkese gidecek. Göndereyim mi?';
+  if(mode()==='sel'){
+    const ids=[...document.querySelectorAll('#people input:checked')].map(i=>i.value);
+    if(!ids.length) return show('err','En az bir kişi seç.');
+    payload.ids=ids; ask=ids.length+' kişiye gidecek. Göndereyim mi?';
+  }
+  if(!confirm(ask)) return;
+  btn.disabled=true; btn.textContent='Gönderiliyor...';
+  try{
+    const d=await api('/api/push-broadcast',payload);
+    show('ok','Gönderildi: '+d.sent+' kişi'+(d.failed?', '+d.failed+' hata':'')+(d.removed?', '+d.removed+' geçersiz kayıt silindi':''));
+  }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
+  btn.disabled=false; btn.textContent='Gönder';
+};
+$('stats').onclick=async()=>{
+  const btn=$('stats'); $('out').style.display='none'; btn.disabled=true;
+  try{
+    if(!$('secret').value) throw new Error('Önce şifreyi yaz');
+    const d=await api('/api/push-stats',{list:mode()==='sel'});
+    if(mode()==='sel') renderPeople(d.people||[]);
+    show('ok','Bildirimi açan: '+d.total+' kişi. Son 24 saatte aktif: '+d.active1+'. Son 7 günde aktif: '+d.active7+'.');
+  }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
+  btn.disabled=false;
+};
+</script>
+</body>
+</html>

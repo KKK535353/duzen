@@ -43,6 +43,7 @@ export default async (req) => {
 
   const rec = {
     sub: { endpoint: sub.endpoint, keys: { p256dh: String(sub.keys.p256dh), auth: String(sub.keys.auth) } },
+    name: b.name !== undefined ? str(b.name, 40).trim() : ((old && old.name) || ""),
     tz: str(b.tz, 60) || "Europe/Istanbul",
     meds,
     done,
