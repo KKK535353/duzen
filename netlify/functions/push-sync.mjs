@@ -20,6 +20,7 @@ export default async (req) => {
 
   if (b.unsubscribe) {
     await s.delete("sub/" + id);
+    await s.delete("assigned/" + id);
     return Response.json({ ok: true });
   }
 
@@ -39,13 +40,22 @@ export default async (req) => {
     end: DATE.test(m.end) ? m.end : "",
   })).filter((m) => m.id && m.name && m.times.length && m.days.length);
 
+  const rem = (Array.isArray(b.rem) ? b.rem : []).slice(0, 20).map((r) => ({
+    id: str(r.id, 40),
+    text: str(r.text, 140).trim(),
+    time: TIME.test(r.time) ? r.time : "",
+    days: (Array.isArray(r.days) ? r.days : []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6),
+  })).filter((r) => r.id && r.text && r.time && r.days.length);
+
   const done = (Array.isArray(b.done) ? b.done : []).slice(0, 300).map((x) => str(x, 80));
 
   const rec = {
     sub: { endpoint: sub.endpoint, keys: { p256dh: String(sub.keys.p256dh), auth: String(sub.keys.auth) } },
     name: b.name !== undefined ? str(b.name, 40).trim() : ((old && old.name) || ""),
+    surname: b.surname !== undefined ? str(b.surname, 40).trim() : ((old && old.surname) || ""),
     tz: str(b.tz, 60) || "Europe/Istanbul",
     meds,
+    rem: b.rem !== undefined ? rem : ((old && old.rem) || []),
     done,
     sent: (old && old.sent) || {},
     updated: Date.now(),

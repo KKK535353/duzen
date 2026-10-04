@@ -168,6 +168,12 @@ const short=s=>{const d=parse(s);return `${d.getDate()} ${AYLAR[d.getMonth()]}`}
 const long=s=>{const d=parse(s);return `${GUN_UZUN[d.getDay()]}, ${d.getDate()} ${AYLAR[d.getMonth()]}`};
 const SYM=['Kramp','Baş ağrısı','Şişkinlik','Yorgunluk','Hassasiyet','Sivilce','Huzursuzluk','Mutlu','Düşük enerji'];
 const FLOW=['Hafif','Orta','Yoğun'];
+const REM_PRESETS=[
+ {label:'Sabah suyu',time:'07:00',text:'Günaydın! İlacını bol suyla içmeyi unutma.'},
+ {label:'Öğle suyu',time:'13:00',text:'Su içmeyi unutma.'},
+ {label:'Hareket',time:'16:00',text:'Kalk, biraz hareket et ve su iç.'},
+ {label:'Akşam kontrolü',time:'21:30',text:'Bugünkü ilaçlarını işaretledin mi?'}
+];
 const ICON={
  home:'<svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
  meds:'<svg viewBox="0 0 24 24"><rect x="2.5" y="8.5" width="19" height="7" rx="3.5" transform="rotate(-45 12 12)"/><path d="M9.2 9.2l5.6 5.6"/></svg>',
@@ -282,7 +288,7 @@ function strip(c,day){
 }
 
 /* ---------- durum ---------- */
-let tab='home',calMonth=(()=>{const d=new Date();d.setDate(1);return d})(),selDay=today(),draft=null,delArm='',alertOpen=null,lastRenderMin=-1;
+let tab='home',calMonth=(()=>{const d=new Date();d.setDate(1);return d})(),selDay=today(),draft=null,delArm='',alertOpen=null,lastRenderMin=-1,rdraft=null;
 const fired={},snooze={};
 
 /* ---------- ekranlar ---------- */
@@ -404,8 +410,18 @@ function renderSet(){
   const s=S.settings,np=('Notification' in window)?Notification.permission:'yok',hasPush=PUSH_OK();
   const pushStatus=s.push?'Açık. Uygulama kapalıyken de ilaç saatinde bildirim gelir':np==='denied'?'İzin kapalı. Telefon ayarlarından bu uygulamanın bildirimlerine izin ver':hasPush?'Kapalı':'Bu cihazda ya da bu açılışta kullanılamıyor. Uygulamayı ana ekrana ekleyip oradan aç (iOS 16.4 ve üstü)';
   const stepper=(k,v)=>`<div class="step"><button data-a="step" data-k="${k}" data-v="-1" aria-label="Azalt">−</button><b>${v} gün</b><button data-a="step" data-k="${k}" data-v="1" aria-label="Artır">+</button></div>`;
+  const dayTxt=r=>r.days.length===7?'Her gün':r.days.map(i=>GUNLER[i]).join(', ');
+  const rems=S.reminders||[];
+  const asgSection=assignedCache.length?`<h3>Senin için ayarlanmış</h3>
+  <p class="fine" style="margin-top:0">Bu hatırlatıcıları senin için ayarlayan kişi ekledi. İstersen kapatabilirsin.</p>
+  ${assignedCache.map(r=>`<div class="set row2"><div><b>${esc(r.text)}</b><small>${r.time}, ${dayTxt(r)}</small></div><button class="sw t ${r.off?'':'on'}" data-a="togAsg" data-id="${r.id}" role="switch" aria-checked="${!r.off}" aria-label="Aç ya da kapat"></button></div>`).join('')}`:'';
+  const remSection=`<h3>Günlük hatırlatıcılar</h3>
+  ${s.push?'':'<div class="note">Bunlar arka plan bildirimiyle gelir. Önce yukarıdan arka plan bildirimlerini aç.</div>'}
+  ${rems.map(r=>`<div class="set row2"><div><b>${esc(r.text)}</b><small>${r.time}, ${dayTxt(r)}</small></div><div class="acts"><button class="btn ghost sm" data-a="editRem" data-id="${r.id}">Düzenle</button><button class="sw t ${r.on?'on':''}" data-a="togRem" data-id="${r.id}" role="switch" aria-checked="${r.on}" aria-label="Aç ya da kapat"></button></div></div>`).join('')}
+  <div class="lbl">Hızlı ekle</div><div class="chips" style="margin-top:0">${REM_PRESETS.map((p,i)=>`<button class="chip" data-a="addPreset" data-i="${i}">${p.label}</button>`).join('')}</div>
+  <button class="btn ghost sm" style="margin-top:12px" data-a="newRem">Kendi hatırlatıcını ekle</button>`;
   return `<div class="head"><div><h1>Ayarlar</h1></div></div>
-  <div class="set"><label style="margin-top:0">Adın (isteğe bağlı)<input id="nm" value="${esc(s.name)}" placeholder="Karşılama için" autocomplete="off"></label><small>Arka plan bildirimini açtıysan adın, duyuru gönderen kişiye görünür.</small></div>
+  <div class="set"><label style="margin-top:0">Adın (isteğe bağlı)<input id="nm" value="${esc(s.name)}" placeholder="Karşılama için" autocomplete="off"></label><label>Soyadın (isteğe bağlı)<input id="sn" value="${esc(s.surname||'')}" placeholder="İstersen yaz" autocomplete="off"></label><small>Arka plan bildirimini açtıysan adın ve soyadın, duyuru gönderen kişiye görünür.</small></div>
   <div class="set row2"><div><b>Ortalama döngü uzunluğu</b><small>${s.auto?'Otomatik hesaplanıyor, kayıt yoksa bu değer kullanılır':'Elle ayarlandı'}</small></div>${stepper('cycleLen',s.cycleLen)}</div>
   <div class="set row2"><div><b>Otomatik hesapla</b><small>Kayıtlarından ortalama çıkarır</small></div><button class="sw ${s.auto?'on':''}" data-a="tgl" data-k="auto" role="switch" aria-checked="${s.auto}" aria-label="Otomatik hesapla"></button></div>
   <div class="set row2"><div><b>Regl süresi</b></div>${stepper('periodLen',s.periodLen)}</div>
@@ -413,6 +429,8 @@ function renderSet(){
   <div class="set row2"><div><b>Sesli ve titreşimli uyarı</b></div><button class="sw t ${s.sound?'on':''}" data-a="tgl" data-k="sound" role="switch" aria-checked="${s.sound}" aria-label="Sesli uyarı"></button></div>
   <div class="set row2"><div><b>Arka plan bildirimleri</b><small>${pushStatus}</small></div>${s.push?`<div class="acts"><button class="btn ghost sm" data-a="testNotif">Dene</button><button class="btn ghost sm" data-a="pushOff">Kapat</button></div>`:(hasPush&&np!=='denied'?`<button class="btn teal sm" data-a="pushOn">Aç</button>`:'')}</div>
   <p class="fine">Açınca ilaç saati geldiğinde uygulama kapalı olsa da bildirim gelir, işaretlemezsen 10 dakika sonra bir kez daha hatırlatılır. iPhone'da bunun için uygulamayı ana ekrana ekleyip oradan açman gerekir.</p>
+  ${remSection}
+  ${asgSection}
   <h3>Veriler</h3>
   <div class="actions" style="margin-top:0"><button class="btn ghost sm" data-a="export">Yedekle</button><label class="btn ghost sm" style="margin:0;text-align:center;color:var(--ink)">Geri yükle<input type="file" id="import" accept="application/json"></label></div>
   <button class="btn danger block" style="margin-top:12px" data-a="reset">${delArm==='reset'?'Emin misin? Tekrar dokun':'Tüm verileri sil'}</button>
@@ -429,7 +447,7 @@ function render(){
 
 /* ---------- ilaç formu ---------- */
 function openSheet(){ $('#sheet').innerHTML=sheetMed(); $('#sheetwrap').classList.add('open'); }
-function closeSheet(){ $('#sheetwrap').classList.remove('open'); draft=null; delArm=''; }
+function closeSheet(){ $('#sheetwrap').classList.remove('open'); draft=null; rdraft=null; delArm=''; }
 function sheetMed(){
   const d=draft;
   return `<div class="grab"></div><h2>${d.id?'İlacı düzenle':'Yeni ilaç'}</h2>
@@ -532,8 +550,9 @@ async function doSync(){
     const t=today(),y=addDays(t,-1),done=[];
     [t,y].forEach(d=>Object.keys(S.log[d]||{}).forEach(k=>done.push(d+'|'+k)));
     const r=await fetch('/api/push-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      subscription:sub.toJSON(),name:S.settings.name||'',tz:Intl.DateTimeFormat().resolvedOptions().timeZone,
-      meds:S.meds.map(m=>({id:m.id,name:m.name,dose:m.dose,times:m.times,days:m.days,start:m.start,end:m.end})),done})});
+      subscription:sub.toJSON(),name:S.settings.name||'',surname:S.settings.surname||'',tz:Intl.DateTimeFormat().resolvedOptions().timeZone,
+      meds:S.meds.map(m=>({id:m.id,name:m.name,dose:m.dose,times:m.times,days:m.days,start:m.start,end:m.end})),
+      rem:(S.reminders||[]).filter(r=>r.on).map(r=>({id:r.id,text:r.text,time:r.time,days:r.days})),done})});
     return r.ok;
   }catch(e){console.error(e);return false;}
 }
@@ -573,15 +592,53 @@ let nameAsked=false;
 function maybeAskName(){
   if(nameAsked||S.settings.name||(S.nameAsk||0)>=2||alertOpen||$('#sheetwrap').classList.contains('open')) return;
   nameAsked=true; S.nameAsk=(S.nameAsk||0)+1; persist();
-  $('#sheet').innerHTML=`<div class="grab"></div><h2>Adını yazar mısın?</h2><p class="sub" style="margin-top:6px">Duyuru gönderen kişi seni tanıyabilsin diye. Ad ya da takma ad yeter. Bildirimi açtıysan yalnızca adın ona görünür.</p><label>Adın<input id="ask-name" maxlength="40" autocomplete="off" placeholder="Örn. Ayşe"></label><div class="actions"><button class="btn ghost" data-a="nameSkip">Şimdi değil</button><button class="btn teal" data-a="nameSave">Kaydet</button></div>`;
+  $('#sheet').innerHTML=`<div class="grab"></div><h2>Adını yazar mısın?</h2><p class="sub" style="margin-top:6px">Duyuru gönderen kişi seni tanıyabilsin diye. Soyadı yazmak isteğe bağlı. Bildirimi açtıysan yalnızca o kişiye görünür.</p><label>Adın<input id="ask-name" maxlength="40" autocomplete="off" placeholder="Örn. Ayşe"></label><label>Soyadın (isteğe bağlı)<input id="ask-surname" maxlength="40" autocomplete="off" placeholder="İstersen yaz"></label><div class="actions"><button class="btn ghost" data-a="nameSkip">Şimdi değil</button><button class="btn teal" data-a="nameSave">Kaydet</button></div>`;
   $('#sheetwrap').classList.add('open');
 }
 function saveName(){
   const v=($('#ask-name')||{}).value; const name=(v||'').trim().slice(0,40);
   if(!name) return toast('Adını yaz ya da "Şimdi değil"e bas');
-  S.settings.name=name; persist(); closeSheet(); render(); toast('Teşekkürler, '+name);
+  S.settings.name=name; S.settings.surname=(($('#ask-surname')||{}).value||'').trim().slice(0,40); persist(); closeSheet(); render(); toast('Teşekkürler, '+name);
 }
-document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='ask-name') saveName(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.target.id==='ask-name'||e.target.id==='ask-surname')) saveName(); });
+
+/* ---------- günlük hatırlatıcılar ---------- */
+function openRem(){ $('#sheet').innerHTML=sheetRem(); $('#sheetwrap').classList.add('open'); }
+function sheetRem(){
+  const d=rdraft;
+  return `<div class="grab"></div><h2>${d.id?'Hatırlatıcıyı düzenle':'Yeni hatırlatıcı'}</h2>
+  <label>Mesaj<input id="r-text" maxlength="140" value="${esc(d.text)}" placeholder="Örn. Su içmeyi unutma"></label>
+  <label>Saat<input id="r-time" type="time" value="${d.time}"></label>
+  <div class="lbl">Günler</div>
+  <div class="days">${GUNLER.map((g,i)=>`<button class="dchip ${d.days.includes(i)?'on':''}" data-a="togRemDay" data-i="${i}">${g}</button>`).join('')}</div>
+  <div class="actions">${d.id?`<button class="btn danger" data-a="delRem">${delArm==='rem'?'Emin misin?':'Sil'}</button>`:`<button class="btn ghost" data-a="closeSheet">Vazgeç</button>`}<button class="btn teal" data-a="saveRem">Kaydet</button></div>`;
+}
+function syncR(){ if(!rdraft) return; rdraft.text=$('#r-text').value; rdraft.time=$('#r-time').value; }
+function saveRem(){
+  syncR(); const d=rdraft, text=d.text.trim();
+  if(!text) return toast('Mesajı yaz');
+  if(!d.time) return toast('Saati seç');
+  if(!d.days.length) return toast('En az bir gün seç');
+  S.reminders=S.reminders||[];
+  const obj={id:d.id||'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),text:text.slice(0,140),time:d.time,days:[...d.days].sort(),on:d.on!==false};
+  const i=S.reminders.findIndex(x=>x.id===obj.id); if(i>=0) S.reminders[i]=obj; else S.reminders.push(obj);
+  persist(); closeSheet(); render(); toast('Hatırlatıcı kaydedildi');
+}
+
+/* ---------- bu kişiye panelden atanmış hatırlatıcılar ---------- */
+let assignedCache=[];
+async function assignedCall(extra){
+  if(!PUSH_OK()||!S.settings.push) return null;
+  try{
+    const reg=await navigator.serviceWorker.ready, sub=await reg.pushManager.getSubscription(); if(!sub) return null;
+    const r=await fetch('/api/push-assigned',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON(),...extra})});
+    if(!r.ok) return null; return (await r.json()).items||[];
+  }catch(e){ return null; }
+}
+async function loadAssigned(){
+  const items=await assignedCall({});
+  if(items){ assignedCache=items; if(tab==='set'&&!(document.activeElement&&document.activeElement.tagName==='INPUT')) render(); }
+}
 
 /* ---------- olaylar ---------- */
 document.addEventListener('click',e=>{
@@ -589,7 +646,7 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-a]'); if(!el) return;
   const a=el.dataset.a,D=el.dataset,t=today();
   switch(a){
-    case 'tab': tab=D.t; delArm=''; render(); $('#main').scrollTop=0; break;
+    case 'tab': tab=D.t; delArm=''; render(); $('#main').scrollTop=0; if(tab==='set') loadAssigned(); break;
     case 'take': case 'skip': {
       const s=slotsFor(t).find(x=>x.key===D.k); if(s){setLog(t,s.key,a==='take'?'taken':'skipped',s.m); render();} break; }
     case 'undo': { const s=slotsFor(t).find(x=>x.key===D.k); if(s){setLog(t,s.key,null,s.m); render();} break; }
@@ -599,6 +656,21 @@ document.addEventListener('click',e=>{
     case 'newMed': draft={id:null,name:'',dose:'',times:['08:00'],days:[0,1,2,3,4,5,6],start:t,end:'',stock:'',note:''}; openSheet(); break;
     case 'editMed': { const m=S.meds.find(x=>x.id===D.id); draft={...m,times:[...m.times],days:[...m.days]}; delArm=''; openSheet(); break; }
     case 'closeSheet': closeSheet(); break;
+    case 'addPreset': { const p=REM_PRESETS[+D.i]; (S.reminders=S.reminders||[]).push({id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),text:p.text,time:p.time,days:[0,1,2,3,4,5,6],on:true}); persist(); render(); toast('Hatırlatıcı eklendi'); break; }
+    case 'newRem': rdraft={id:null,text:'',time:'13:00',days:[0,1,2,3,4,5,6],on:true}; delArm=''; openRem(); break;
+    case 'editRem': { const r=(S.reminders||[]).find(x=>x.id===D.id); if(!r) break; rdraft={...r,days:[...r.days]}; delArm=''; openRem(); break; }
+    case 'togRemDay': { syncR(); const i=+D.i,k=rdraft.days.indexOf(i); k>=0?rdraft.days.splice(k,1):rdraft.days.push(i); openRem(); break; }
+    case 'saveRem': saveRem(); break;
+    case 'delRem':
+      if(delArm!=='rem'){syncR(); delArm='rem'; openRem();}
+      else{ S.reminders=(S.reminders||[]).filter(x=>x.id!==rdraft.id); persist(); closeSheet(); render(); toast('Hatırlatıcı silindi'); }
+      break;
+    case 'togRem': { const r=(S.reminders||[]).find(x=>x.id===D.id); if(r){r.on=!r.on; persist(); render();} break; }
+    case 'togAsg': {
+      const r=assignedCache.find(x=>x.id===D.id); if(!r) break;
+      r.off=!r.off; render();
+      assignedCall({id:r.id,off:r.off}).then(items=>{ if(items){assignedCache=items; if(tab==='set') render();} else toast('Kaydedilemedi, tekrar dene'); });
+      break; }
     case 'nameSave': saveName(); break;
     case 'nameSkip': closeSheet(); break;
     case 'addTime': syncDraft(); draft.times.push('12:00'); openSheet(); break;
@@ -638,6 +710,7 @@ document.addEventListener('change',e=>{
   const el=e.target;
   if(el.id==='note'){ const o=S.day[selDay]=S.day[selDay]||{}; o.note=el.value; persist(); }
   else if(el.id==='nm'){ S.settings.name=el.value.trim(); persist(); }
+  else if(el.id==='sn'){ S.settings.surname=el.value.trim().slice(0,40); persist(); }
   else if(el.id==='import'&&el.files[0]){
     const r=new FileReader();
     r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d||!Array.isArray(d.meds)) throw 0; S={...S,...d,settings:{...S.settings,...(d.settings||{})}}; persist(); render(); toast('Yedek yüklendi'); }catch(err){ toast('Dosya okunamadı'); } };

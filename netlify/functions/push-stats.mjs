@@ -22,7 +22,7 @@ export default async (req) => {
   for (const { key } of blobs) {
     const rec = await s.get(key, { type: "json" });
     if (!rec || !rec.updated) continue;
-    if (b.list) people.push({ id: key.slice(4), name: String(rec.name || ""), updated: rec.updated });
+    if (b.list) people.push({ id: key.slice(4), name: String(rec.name || ""), surname: String(rec.surname || ""), updated: rec.updated });
     const age = now - rec.updated;
     if (age <= day) active1++;
     if (age <= 7 * day) active7++;

@@ -12,44 +12,77 @@
 *{box-sizing:border-box;margin:0}
 body{font-family:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;background:#F6F4FA;color:#1F1B33;padding:24px 20px 40px;max-width:480px;margin:0 auto;line-height:1.45}
 h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
-.sub{color:#5E5A74;margin-bottom:18px}
-label.f{display:block;font-size:14px;font-weight:700;color:#5E5A74;margin-top:14px}
-input[type=text],input[type=password],textarea{width:100%;margin-top:6px;padding:12px 14px;border:1.5px solid #E4E0EE;border-radius:12px;background:#fff;font:inherit;font-size:16px;color:inherit}
+.sub{color:#5E5A74;margin-bottom:14px}
+.tabs{display:flex;gap:8px;margin:14px 0 6px}
+.tabs .t{flex:1;margin:0;padding:11px;border-radius:999px;background:transparent;border:1.5px solid #E4E0EE;color:#1F1B33;font-size:15px}
+.tabs .t.on{background:#1F1B33;border-color:#1F1B33;color:#fff}
+label.f,.f{display:block;font-size:14px;font-weight:700;color:#5E5A74;margin-top:14px}
+input[type=text],input[type=password],input[type=time],textarea{width:100%;margin-top:6px;padding:12px 14px;border:1.5px solid #E4E0EE;border-radius:12px;background:#fff;font:inherit;font-size:16px;color:inherit}
 textarea{min-height:110px;resize:vertical}
 .to{display:flex;gap:10px;margin-top:6px}
 .to label{flex:1;display:flex;align-items:center;gap:8px;padding:11px 12px;border:1.5px solid #E4E0EE;border-radius:12px;background:#fff;font-weight:650;font-size:15px}
 .to input{width:18px;height:18px;margin:0}
-#people{margin-top:10px;display:none}
+.people{margin-top:10px;display:none}
 .p{display:flex;gap:10px;align-items:center;padding:10px 12px;background:#fff;border-radius:12px;margin-bottom:6px}
 .p input{width:20px;height:20px;margin:0;flex:none}
 .p b{display:block}
-.p small{color:#5E5A74;font-size:13px}
+.p small,.a small{color:#5E5A74;font-size:13px;display:block}
+.a{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;background:#fff;border-radius:12px;margin-bottom:6px}
+.a b{display:block}
+.a button{margin:0;width:auto;padding:8px 14px;font-size:14px;background:transparent;border:1.5px solid #E7B9B5;color:#B3261E}
+.days{display:flex;gap:6px;margin-top:6px}
+.days button{margin:0;flex:1;padding:10px 0;border-radius:12px;background:#fff;border:1.5px solid #E4E0EE;color:#1F1B33;font-size:13px}
+.days button.on{background:#0F7F7E;border-color:#0F7F7E;color:#fff}
 button{margin-top:20px;width:100%;border:0;border-radius:999px;padding:14px;font:inherit;font-weight:700;background:#0F7F7E;color:#fff;font-size:16px}
 button.ghost{background:transparent;border:1.5px solid #E4E0EE;color:#1F1B33;margin-top:10px}
 button:disabled{opacity:.6}
 #out{margin-top:16px;padding:12px 14px;border-radius:12px;display:none;font-weight:600}
 #out.ok{background:#DDF1F0;color:#0F7F7E}
 #out.err{background:#F9DCE6;color:#BA2F5C}
+.hint{font-size:13px;color:#5E5A74;margin-top:10px}
 :focus-visible{outline:3px solid #6552CF;outline-offset:2px}
 </style>
 </head>
 <body>
-<h1>Duyuru gönder</h1>
+<h1>Panel</h1>
 <p class="sub">Bildirime izin verenlere gider.</p>
 <label class="f">Şifre<input id="secret" type="password" autocomplete="current-password"></label>
-<div class="f">Kime?</div>
-<div class="to">
-  <label><input type="radio" name="to" value="all" checked>Herkese</label>
-  <label><input type="radio" name="to" value="sel">Seçtiklerime</label>
+<div class="tabs">
+  <button class="t on" data-t="ann">Duyuru</button>
+  <button class="t" data-t="asg">Hatırlatıcı ata</button>
 </div>
-<div id="people"></div>
-<label class="f">Başlık<input id="title" type="text" maxlength="80" placeholder="Örn. Yeni sürüm"></label>
-<label class="f">Mesaj<textarea id="body" maxlength="300" placeholder="Kısa ve net yaz"></textarea></label>
-<button id="send">Gönder</button>
-<button id="stats" class="ghost">Kaç kişi kayıtlı?</button>
+
+<section id="p-ann">
+  <div class="f">Kime?</div>
+  <div class="to">
+    <label><input type="radio" name="to" value="all" checked>Herkese</label>
+    <label><input type="radio" name="to" value="sel">Seçtiklerime</label>
+  </div>
+  <div id="people" class="people"></div>
+  <label class="f">Başlık<input id="title" type="text" maxlength="80" placeholder="Örn. Yeni sürüm"></label>
+  <label class="f">Mesaj<textarea id="body" maxlength="300" placeholder="Kısa ve net yaz"></textarea></label>
+  <button id="send">Gönder</button>
+  <button id="stats" class="ghost">Kaç kişi kayıtlı?</button>
+</section>
+
+<section id="p-asg" style="display:none">
+  <p class="hint">Seçtiğin kişiye her gün (ya da seçtiğin günlerde) belirlediğin saatte bildirim gider. Kişiye bildirimle haber verilir ve Ayarlar'dan kapatabilir.</p>
+  <div class="f">Kime?</div>
+  <button id="load2" class="ghost" style="margin-top:6px">Kişileri getir</button>
+  <div id="people2" class="people"></div>
+  <label class="f">Mesaj<input id="atext" type="text" maxlength="140" placeholder="Örn. Günaydın! İlacını bol suyla iç."></label>
+  <label class="f">Saat<input id="atime" type="time" value="07:00"></label>
+  <div class="f">Günler</div>
+  <div class="days" id="adays"></div>
+  <button id="asgBtn">Ata</button>
+  <button id="showAsg" class="ghost">Atananları göster</button>
+  <div id="assigned" style="margin-top:12px"></div>
+</section>
+
 <div id="out" role="status"></div>
 <script>
 const $=id=>document.getElementById(id);
+const GUNLER=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
 const mode=()=>document.querySelector('input[name=to]:checked').value;
 function show(cls,txt){const o=$('out');o.className=cls;o.textContent=txt;o.style.display='block';}
 async function api(path,payload){
@@ -64,26 +97,37 @@ function ago(ts){
   const h=Math.round(m/60); if(h<48) return h+' sa önce';
   return Math.round(h/24)+' gün önce';
 }
-function renderPeople(list){
-  const box=$('people'); box.textContent=''; box.style.display='block';
+const dayTxt=days=>days.length===7?'her gün':days.map(i=>GUNLER[i]).join(', ');
+function renderPeople(list,box){
+  box.textContent=''; box.style.display='block';
   if(!list.length){const p=document.createElement('p');p.className='sub';p.textContent='Kayıtlı kimse yok.';box.appendChild(p);return;}
   list.forEach(p=>{
     const l=document.createElement('label'); l.className='p';
     const c=document.createElement('input'); c.type='checkbox'; c.value=p.id;
     const s=document.createElement('span');
-    const b=document.createElement('b'); b.textContent=p.name||'İsimsiz';
+    const b=document.createElement('b'); b.textContent=[p.name,p.surname].filter(Boolean).join(' ')||'İsimsiz';
     const sm=document.createElement('small'); sm.textContent='son aktif '+ago(p.updated)+', kod '+p.id.slice(0,4);
     s.append(b,sm); l.append(c,s); box.appendChild(l);
   });
 }
-async function loadPeople(){
+async function loadPeople(box){
   if(!$('secret').value) throw new Error('Önce şifreyi yaz');
-  const d=await api('/api/push-stats',{list:true}); renderPeople(d.people||[]); return d;
+  const d=await api('/api/push-stats',{list:true}); renderPeople(d.people||[],box); return d;
 }
+
+/* sekmeler */
+function setTab(t){
+  ['ann','asg'].forEach(x=>{$('p-'+x).style.display=x===t?'block':'none';});
+  document.querySelectorAll('.tabs .t').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  $('out').style.display='none';
+}
+document.querySelectorAll('.tabs .t').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
+
+/* ---- Duyuru ---- */
 document.querySelectorAll('input[name=to]').forEach(r=>r.onchange=async()=>{
   $('out').style.display='none';
   if(mode()==='all'){$('people').style.display='none';return;}
-  try{await loadPeople();}catch(e){show('err',e.message);document.querySelector('input[name=to][value=all]').checked=true;$('people').style.display='none';}
+  try{await loadPeople($('people'));}catch(e){show('err',e.message);document.querySelector('input[name=to][value=all]').checked=true;$('people').style.display='none';}
 });
 $('send').onclick=async()=>{
   const btn=$('send'); $('out').style.display='none';
@@ -107,10 +151,55 @@ $('stats').onclick=async()=>{
   try{
     if(!$('secret').value) throw new Error('Önce şifreyi yaz');
     const d=await api('/api/push-stats',{list:mode()==='sel'});
-    if(mode()==='sel') renderPeople(d.people||[]);
+    if(mode()==='sel') renderPeople(d.people||[],$('people'));
     show('ok','Bildirimi açan: '+d.total+' kişi. Son 24 saatte aktif: '+d.active1+'. Son 7 günde aktif: '+d.active7+'.');
   }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
   btn.disabled=false;
+};
+
+/* ---- Hatırlatıcı ata ---- */
+GUNLER.forEach((g,i)=>{
+  const b=document.createElement('button'); b.type='button'; b.textContent=g; b.dataset.i=i; b.className='on';
+  b.onclick=()=>b.classList.toggle('on'); $('adays').appendChild(b);
+});
+$('load2').onclick=async()=>{
+  $('out').style.display='none';
+  try{await loadPeople($('people2'));}catch(e){show('err',e.message);}
+};
+async function showAssigned(){
+  const box=$('assigned'); box.textContent='';
+  const d=await api('/api/push-assign',{action:'all'});
+  if(!d.items.length){const p=document.createElement('p');p.className='sub';p.textContent='Atanmış hatırlatıcı yok.';box.appendChild(p);return;}
+  d.items.forEach(it=>{
+    const row=document.createElement('div'); row.className='a';
+    const left=document.createElement('div');
+    const b=document.createElement('b'); b.textContent=(it.name||'İsimsiz')+': '+it.text;
+    const sm=document.createElement('small'); sm.textContent=it.time+', '+dayTxt(it.days)+(it.off?', kişi kapattı':', açık');
+    left.append(b,sm);
+    const del=document.createElement('button'); del.type='button'; del.textContent='Sil';
+    del.onclick=async()=>{
+      if(!confirm('Bu hatırlatıcı silinsin mi?')) return;
+      try{await api('/api/push-assign',{action:'del',pid:it.pid,rid:it.rid}); await showAssigned();}catch(e){show('err',e.message);}
+    };
+    row.append(left,del); box.appendChild(row);
+  });
+}
+$('showAsg').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz'); await showAssigned(); }catch(e){show('err',e.message);} };
+$('asgBtn').onclick=async()=>{
+  const btn=$('asgBtn'); $('out').style.display='none';
+  if(!$('secret').value) return show('err','Önce şifreyi yaz.');
+  const ids=[...document.querySelectorAll('#people2 input:checked')].map(i=>i.value);
+  if(!ids.length) return show('err','Önce kişileri getir ve en az birini seç.');
+  const text=$('atext').value.trim(), time=$('atime').value, days=[...document.querySelectorAll('#adays .on')].map(b=>+b.dataset.i);
+  if(!text||!time||!days.length) return show('err','Mesaj, saat ve en az bir gün gerekli.');
+  if(!confirm(ids.length+' kişiye tekrarlayan hatırlatıcı atanacak ve kendilerine haber verilecek. Atayayım mı?')) return;
+  btn.disabled=true; btn.textContent='Atanıyor...';
+  try{
+    const d=await api('/api/push-assign',{action:'add',ids,text,time,days});
+    show('ok',d.count+' kişiye atandı'+(d.skipped?', '+d.skipped+' kişi atlandı (en fazla 10 hatırlatıcı ya da kayıt yok)':'')+'.');
+    $('atext').value=''; await showAssigned();
+  }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
+  btn.disabled=false; btn.textContent='Ata';
 };
 </script>
 </body>
