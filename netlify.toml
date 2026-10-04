@@ -1,0 +1,6 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  external_node_modules = ["web-push"]

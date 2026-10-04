@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F6F4FA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Düzen">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png">
+<title>Düzen: İlaç ve Döngü</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--ink:#1F1B33;--ink2:#5E5A74;--line:#E4E0EE;--paper:#F6F4FA;--surf:#fff;
+--teal:#0F7F7E;--teal-soft:#DDF1F0;--berry:#BA2F5C;--berry-soft:#F9DCE6;--violet:#6552CF;--violet-soft:#E6E1FA;--warn:#B4561B;--warn-soft:#FBE9DC}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:ui-rounded,"SF Pro Rounded","Nunito","Segoe UI",system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.45}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
+#app{max-width:480px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;position:relative;background:var(--paper)}
+main{flex:1;overflow-y:auto;padding:max(22px,env(safe-area-inset-top)) 20px 28px;-webkit-overflow-scrolling:touch}
+nav{display:flex;border-top:1px solid var(--line);background:var(--surf);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;padding:10px 0 8px;border:0;background:none;color:var(--ink2);font-size:12px;font-weight:650;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button.on{color:var(--c)}
+nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+h1{font-size:28px;line-height:1.15;font-weight:800;letter-spacing:-.02em}
+h2{font-size:20px;font-weight:750;letter-spacing:-.01em}
+h3{font-size:15px;font-weight:700;color:var(--ink2);margin:26px 0 8px}
+.sub{color:var(--ink2);font-size:15px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px}
+.btn{border:0;border-radius:999px;padding:12px 20px;font-weight:700;background:var(--ink);color:#fff}
+.btn.teal{background:var(--teal)} .btn.berry{background:var(--berry)}
+.btn.ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+.btn.danger{background:transparent;border:1.5px solid #E7B9B5;color:#B3261E}
+.btn.sm{padding:7px 14px;font-size:14px}
+.btn.block{width:100%}
+.btn:active{transform:scale(.97)}
+
+.ring-row{display:flex;align-items:center;gap:18px;padding:6px 0 4px}
+.ring{width:84px;height:84px;flex:none}
+.ring circle{fill:none;stroke-width:9}
+.ring .bg{stroke:var(--teal-soft)} .ring .fg{stroke:var(--teal);stroke-linecap:round;transition:stroke-dashoffset .5s}
+.ring text{font-size:20px;font-weight:800;fill:var(--ink);text-anchor:middle}
+.ring-row b{font-size:19px;display:block}
+
+.doses{list-style:none;margin-top:6px}
+.dose{display:grid;grid-template-columns:54px 1fr auto;gap:10px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)}
+.dose .dt{font-weight:800;font-size:17px;font-variant-numeric:tabular-nums}
+.dose .di b{display:block;font-weight:700}
+.dose .di span{font-size:14px;color:var(--ink2)}
+.dose.late .dt,.dose.late .di span{color:var(--warn)}
+.dose.taken .di b,.dose.skipped .di b{color:var(--ink2);text-decoration:line-through;text-decoration-thickness:1.5px}
+.acts{display:flex;gap:6px}
+.chip-btn{border:0;border-radius:999px;padding:7px 14px;font-size:14px;font-weight:700;background:var(--teal-soft);color:var(--teal)}
+.dose.skipped .chip-btn{background:var(--line);color:var(--ink2)}
+.note{background:var(--warn-soft);color:#7A3A0F;border-radius:14px;padding:11px 14px;font-size:14.5px;margin-top:12px}
+.empty{border:1.5px dashed var(--line);border-radius:18px;padding:20px;text-align:center;margin-top:10px}
+.empty p{color:var(--ink2);margin:6px 0 14px}
+
+.cyc-head{font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--berry)}
+.strip{display:flex;gap:2px;align-items:center;height:34px;margin:14px 0 8px}
+.seg{flex:1;height:12px;border-radius:4px;background:var(--line)}
+.seg.p{background:var(--berry)} .seg.f{background:#B9AEF0} .seg.o{background:var(--violet)}
+.seg.now{height:30px;border-radius:6px;outline:2.5px solid var(--ink);outline-offset:1px;position:relative;z-index:1}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--ink2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.prompt{background:var(--berry-soft);border-radius:16px;padding:14px;margin-top:14px}
+.prompt p{margin-bottom:10px;font-weight:600}
+.prompt .row{display:flex;gap:8px}
+
+.bars{display:flex;gap:8px;align-items:flex-end;height:96px;margin:10px 0 4px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;font-size:12px;color:var(--ink2)}
+.bar i{width:100%;border-radius:8px;background:var(--teal);min-height:6px}
+.bar i.none{background:transparent;border:1.5px dashed var(--line);height:6px!important}
+.med{display:block;width:100%;text-align:left;background:var(--surf);border:0;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 0 var(--line)}
+.med b{font-size:17px}
+.med .meta{color:var(--ink2);font-size:14px;margin-top:2px}
+.tchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tchips span{background:var(--teal-soft);color:var(--teal);font-weight:750;border-radius:999px;padding:3px 11px;font-size:14px;font-variant-numeric:tabular-nums}
+
+.monthbar{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px}
+.monthbar button.ic{border:0;background:var(--surf);border-radius:50%;width:40px;height:40px;font-size:20px;font-weight:700}
+.wk,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wk span{text-align:center;font-size:12.5px;font-weight:700;color:var(--ink2);padding-bottom:4px}
+.cell{aspect-ratio:1;border:0;border-radius:50%;background:transparent;font-weight:650;display:flex;align-items:center;justify-content:center;position:relative}
+.cell.period{background:var(--berry);color:#fff}
+.cell.pred{border:2px dashed var(--berry);color:var(--berry)}
+.cell.fert{background:var(--violet-soft);color:var(--violet)}
+.cell.ov{background:var(--violet);color:#fff}
+.cell.today span{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:2px}
+.cell.sel{box-shadow:0 0 0 2.5px var(--ink)}
+.cell u{position:absolute;bottom:5px;width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.8}
+.stats{display:flex;gap:18px;margin:16px 0 4px}
+.stats div{flex:1} .stats b{display:block;font-size:18px} .stats span{font-size:13px;color:var(--ink2)}
+.panel{background:var(--surf);border-radius:20px;padding:16px;margin-top:16px}
+.row2{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sw{width:50px;height:30px;border-radius:999px;border:0;background:var(--line);position:relative;flex:none;transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sw.on{background:var(--berry)} .sw.on::after{transform:translateX(20px)}
+.sw.t.on{background:var(--teal)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:7px 14px;font-size:14.5px;font-weight:650}
+.chip.on{background:var(--berry);border-color:var(--berry);color:#fff}
+.chip.v.on{background:var(--violet);border-color:var(--violet)}
+.fine{font-size:13px;color:var(--ink2);margin-top:14px}
+
+label{display:block;font-size:14px;font-weight:700;color:var(--ink2);margin-top:14px}
+.lbl{font-size:14px;font-weight:700;color:var(--ink2);margin-top:16px;margin-bottom:6px}
+input,textarea{width:100%;display:block;margin-top:6px;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:#fff;font-size:16px;color:var(--ink);font-weight:500}
+textarea{resize:none;min-height:70px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.trow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.trow input{margin:0}
+.x{border:0;background:var(--line);width:42px;height:42px;border-radius:12px;font-size:18px;flex:none}
+.days{display:flex;gap:6px}
+.dchip{flex:1;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px 0;font-weight:700;font-size:13px}
+.dchip.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.actions{display:flex;gap:10px;margin-top:22px}
+.actions .btn{flex:1}
+.step{display:flex;align-items:center;gap:14px}
+.step button{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-size:20px;font-weight:700}
+.step b{min-width:54px;text-align:center}
+.set{padding:14px 0;border-bottom:1px solid var(--line)}
+.set small{display:block;color:var(--ink2);font-size:13.5px;margin-top:2px}
+input[type=file]{display:none}
+
+#sheetwrap,#alert{position:fixed;inset:0;background:rgba(31,27,51,.45);display:none;z-index:20}
+#sheetwrap.open{display:flex;align-items:flex-end;justify-content:center}
+#alert.open{display:flex;align-items:center;justify-content:center;padding:24px}
+.sheet{background:#fff;width:100%;max-width:480px;border-radius:24px 24px 0 0;padding:12px 20px calc(24px + env(safe-area-inset-bottom));max-height:92dvh;overflow-y:auto;animation:up .22s ease-out}
+.grab{width:42px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 14px}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.abox{background:#fff;border-radius:26px;padding:26px 22px 22px;width:100%;max-width:380px;text-align:center;animation:up .22s ease-out}
+.abox .big{font-size:52px;font-weight:800;letter-spacing:-.03em;color:var(--teal);font-variant-numeric:tabular-nums;line-height:1.1;margin:6px 0}
+.abox .actions{flex-direction:column}
+#toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;font-weight:650;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90%;text-align:center}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <main id="main"></main>
+  <nav id="nav"></nav>
+</div>
+<div id="sheetwrap"><div class="sheet" id="sheet"></div></div>
+<div id="alert"></div>
+<div id="toast" role="status"></div>
+
+<script>
+/* ---------- yardımcılar ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const pad=n=>String(n).padStart(2,'0');
+const fmt=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return fmt(d)};
+const diff=(a,b)=>Math.round((parse(a)-parse(b))/864e5);
+const today=()=>fmt(new Date());
+const nowMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes()};
+const tmin=t=>{const [h,m]=t.split(':').map(Number);return h*60+m};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const AYLAR=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const GUNLER=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+const GUN_UZUN=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+const short=s=>{const d=parse(s);return `${d.getDate()} ${AYLAR[d.getMonth()]}`};
+const long=s=>{const d=parse(s);return `${GUN_UZUN[d.getDay()]}, ${d.getDate()} ${AYLAR[d.getMonth()]}`};
+const SYM=['Kramp','Baş ağrısı','Şişkinlik','Yorgunluk','Hassasiyet','Sivilce','Huzursuzluk','Mutlu','Düşük enerji'];
+const FLOW=['Hafif','Orta','Yoğun'];
+const ICON={
+ home:'<svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
+ meds:'<svg viewBox="0 0 24 24"><rect x="2.5" y="8.5" width="19" height="7" rx="3.5" transform="rotate(-45 12 12)"/><path d="M9.2 9.2l5.6 5.6"/></svg>',
+ cycle:'<svg viewBox="0 0 24 24"><path d="M12 3c3.5 4.5 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 2.5-6.5 6-11z"/></svg>',
+ set:'<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>'
+};
+const TABS=[['home','Bugün','#0F7F7E'],['meds','İlaçlar','#0F7F7E'],['cycle','Döngü','#BA2F5C'],['set','Ayarlar','#1F1B33']];
+
+/* ---------- veri ---------- */
+const KEY='duzen:v1';
+let S={meds:[],log:{},periodDays:{},day:{},dismissed:'',settings:{name:'',cycleLen:28,periodLen:5,auto:true,sound:true,notif:false}};
+const store={
+  async load(){
+    try{ if(window.storage){const r=await window.storage.get(KEY); if(r&&r.value) return JSON.parse(r.value);} }catch(e){}
+    try{ const v=localStorage.getItem(KEY); if(v) return JSON.parse(v); }catch(e){}
+    return null;
+  },
+  async save(){
+    const v=JSON.stringify(S);
+    try{ if(window.storage){await window.storage.set(KEY,v);return;} }catch(e){}
+    try{ localStorage.setItem(KEY,v); }catch(e){}
+  }
+};
+let saveT; const persist=()=>{clearTimeout(saveT);saveT=setTimeout(()=>store.save(),200); if(S&&S.settings&&S.settings.push) pushSync();};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2200)}
+
+/* ---------- ilaç mantığı ---------- */
+function medActive(m,d){
+  if(d<m.start) return false; if(m.end&&d>m.end) return false;
+  return m.days.includes((parse(d).getDay()+6)%7);
+}
+function slotsFor(d){
+  const out=[];
+  S.meds.forEach(m=>{ if(medActive(m,d)) m.times.forEach(t=>out.push({m,t,key:m.id+'|'+t})); });
+  return out.sort((a,b)=>tmin(a.t)-tmin(b.t)||a.m.name.localeCompare(b.m.name,'tr'));
+}
+const getLog=(d,k)=>(S.log[d]||{})[k];
+function setLog(d,k,val,m){
+  const prev=getLog(d,k); S.log[d]=S.log[d]||{};
+  if(val) S.log[d][k]=val; else delete S.log[d][k];
+  if(m&&m.stock!=null){
+    if(val==='taken'&&prev!=='taken') m.stock=Math.max(0,m.stock-1);
+    else if(prev==='taken'&&val!=='taken') m.stock+=1;
+  }
+  persist();
+}
+function adherence(){
+  const t=today(),nm=nowMin(),out=[];
+  for(let i=6;i>=0;i--){
+    const d=addDays(t,-i);
+    const sl=slotsFor(d).filter(s=>d<t||tmin(s.t)<=nm||getLog(d,s.key));
+    const taken=sl.filter(s=>getLog(d,s.key)==='taken').length;
+    out.push({d,exp:sl.length,taken});
+  }
+  return out;
+}
+
+/* ---------- döngü mantığı ---------- */
+function runs(){
+  const days=Object.keys(S.periodDays).filter(d=>S.periodDays[d]).sort(), r=[];
+  days.forEach(d=>{const l=r[r.length-1]; if(l&&diff(d,l.end)===1) l.end=d; else r.push({start:d,end:d});});
+  return r;
+}
+function cycleInfo(){
+  const R=runs(),st=S.settings; let avg=st.cycleLen,n=0;
+  if(R.length>=2){
+    const starts=R.slice(-7).map(x=>x.start),gaps=[];
+    for(let i=1;i<starts.length;i++){const g=diff(starts[i],starts[i-1]); if(g>=15&&g<=60) gaps.push(g);}
+    if(gaps.length){n=gaps.length; if(st.auto) avg=Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length);}
+  }
+  return {runs:R,last:R[R.length-1]||null,avg,n};
+}
+function predict(){
+  const c=cycleInfo(); if(!c.last) return null;
+  const list=[];
+  for(let k=1;k<=8;k++){const s=addDays(c.last.start,c.avg*k); list.push({start:s,ov:addDays(s,-14),fs:addDays(s,-19),fe:addDays(s,-13)});}
+  return {c,list};
+}
+function dayType(d,P,t){
+  if(S.periodDays[d]) return 'period';
+  if(!P) return '';
+  for(const p of P.list){
+    if(d>=t&&d>=p.start&&d<=addDays(p.start,S.settings.periodLen-1)) return 'pred';
+    if(d===p.ov) return 'ov';
+    if(d>=p.fs&&d<=p.fe) return 'fert';
+  }
+  return '';
+}
+function phase(t,P){
+  if(S.periodDays[t]) return 'Regl dönemi';
+  const p=P.list[0];
+  if(t===p.ov) return 'Tahmini yumurtlama günü';
+  if(t>=p.fs&&t<=p.fe) return 'Tahmini verimli dönem';
+  if(t<p.fs) return 'Foliküler evre';
+  return 'Luteal evre';
+}
+function startPeriod(date){
+  const t=today(),end=addDays(date,S.settings.periodLen-1);
+  let d=date; while(d<=end&&d<=t){S.periodDays[d]=true;d=addDays(d,1);}
+  persist();
+}
+function strip(c,day){
+  const L=c.avg,ovI=L-14; let h='';
+  for(let i=0;i<L;i++){
+    let cls='seg';
+    if(i<S.settings.periodLen) cls+=' p'; else if(i===ovI) cls+=' o'; else if(i>=ovI-5&&i<=ovI+1) cls+=' f';
+    if(i===Math.max(0,Math.min(day-1,L-1))) cls+=' now';
+    h+=`<i class="${cls}"></i>`;
+  }
+  return `<div class="strip" role="img" aria-label="Döngü çizelgesi">${h}</div>
+  <div class="legend"><span><i style="background:var(--berry)"></i>Regl</span><span><i style="background:#B9AEF0"></i>Verimli dönem</span><span><i style="background:var(--violet)"></i>Yumurtlama</span></div>`;
+}
+
+/* ---------- durum ---------- */
+let tab='home',calMonth=(()=>{const d=new Date();d.setDate(1);return d})(),selDay=today(),draft=null,delArm='',alertOpen=null,lastRenderMin=-1;
+const fired={},snooze={};
+
+/* ---------- ekranlar ---------- */
+function greeting(){
+  const h=new Date().getHours();
+  const g=h<5?'İyi geceler':h<12?'Günaydın':h<18?'İyi günler':h<22?'İyi akşamlar':'İyi geceler';
+  return S.settings.name?`${g}, ${esc(S.settings.name)}`:g;
+}
+function renderHome(){
+  const t=today(),slots=slotsFor(t),nm=nowMin();
+  const taken=slots.filter(s=>getLog(t,s.key)==='taken').length,total=slots.length;
+  const pending=slots.filter(s=>!getLog(t,s.key));
+  const next=pending.find(s=>tmin(s.t)>=nm),overdue=pending.filter(s=>tmin(s.t)<nm).length;
+  const C=2*Math.PI*34, off=total?C*(1-taken/total):C;
+  let summary;
+  if(!total) summary='<b>Bugün planlı ilaç yok</b><span class="sub">İlaç ekleyerek hatırlatıcıları başlat.</span>';
+  else if(!pending.length) summary='<b>Bugünkü dozlar tamam</b><span class="sub">Eline sağlık, yarın görüşürüz.</span>';
+  else if(overdue) summary=`<b>${overdue} doz bekliyor</b><span class="sub">${next?`Sıradaki: ${next.t}, ${esc(next.m.name)}`:'Saati geçen dozları işaretle.'}</span>`;
+  else summary=`<b>Sıradaki: ${next.t}</b><span class="sub">${esc(next.m.name)}${next.m.dose?', '+esc(next.m.dose):''}</span>`;
+  const rows=slots.map(s=>{
+    const st=getLog(t,s.key),late=!st&&tmin(s.t)<nm;
+    return `<li class="dose ${st||''} ${late?'late':''}">
+      <div class="dt">${s.t}</div>
+      <div class="di"><b>${esc(s.m.name)}</b><span>${esc(s.m.dose||'')}${late?(s.m.dose?', ':'')+'gecikti':''}</span></div>
+      ${st?`<button class="chip-btn" data-a="undo" data-k="${s.key}" title="Geri almak için dokun">${st==='taken'?'Alındı':'Atlandı'}</button>`
+          :`<div class="acts"><button class="btn teal sm" data-a="take" data-k="${s.key}">Aldım</button><button class="btn ghost sm" data-a="skip" data-k="${s.key}">Atla</button></div>`}
+    </li>`}).join('');
+  const low=S.meds.filter(m=>m.stock!=null&&m.stock<=5).map(m=>`<div class="note">${esc(m.name)}: ${m.stock===0?'doz kalmadı':m.stock+' doz kaldı'}. Yenisini almayı unutma.</div>`).join('');
+
+  /* döngü bölümü */
+  let cyc; const P=predict();
+  if(!P){
+    cyc=`<div class="empty"><b>Döngünü takip et</b><p>Son regl başlangıç tarihini girersen tahminler hazır olur.</p><button class="btn berry" data-a="tab" data-t="cycle">Döngüye git</button></div>`;
+  }else{
+    const c=P.c,inP=!!S.periodDays[t],day=diff(t,c.last.start)+1,p0=P.list[0];
+    let head;
+    if(inP) head=`Regl ${day}. gün`;
+    else{const dto=diff(p0.start,t); head=dto>1?`Regle ${dto} gün var`:dto===1?'Regl yarın bekleniyor':dto===0?'Regl bugün bekleniyor':`Regl ${-dto} gün gecikti`;}
+    const yd=addDays(t,-1);
+    const ask=!inP&&S.periodDays[yd]&&S.dismissed!==t&&c.last.end===yd&&diff(yd,c.last.start)+1<S.settings.periodLen+3;
+    cyc=`<div class="cyc-head">${head}</div>
+      <div class="sub">${phase(t,P)}. Döngünün ${day}. günü. Sonraki regl tahmini: ${short(p0.start)}.</div>
+      ${strip(c,day)}
+      ${ask?`<div class="prompt"><p>Dün regl günüydü. Bugün de devam ediyor mu?</p><div class="row"><button class="btn berry sm" data-a="contYes">Evet, devam ediyor</button><button class="btn ghost sm" data-a="contNo">Hayır</button></div></div>`:''}
+      ${!inP&&!ask?`<button class="btn ghost sm" style="margin-top:12px" data-a="startToday">Regl bugün başladı</button>`:''}`;
+  }
+  return `<div class="head"><div><h1>${greeting()}</h1><div class="sub">${long(t)}</div></div></div>
+  <div class="ring-row">
+    <svg class="ring" viewBox="0 0 84 84" aria-hidden="true"><circle class="bg" cx="42" cy="42" r="34"/><circle class="fg" cx="42" cy="42" r="34" transform="rotate(-90 42 42)" stroke-dasharray="${C}" stroke-dashoffset="${off}"/><text x="42" y="49">${taken}/${total}</text></svg>
+    <div>${summary}</div>
+  </div>
+  ${low}
+  ${total?`<h3>Bugünün dozları</h3><ul class="doses">${rows}</ul>`:`<div class="empty"><p>Henüz ilaç eklemedin.</p><button class="btn teal" data-a="newMed">İlaç ekle</button></div>`}
+  <h3>Döngü</h3>${cyc}`;
+}
+
+function renderMeds(){
+  const A=adherence(),exp=A.reduce((a,b)=>a+b.exp,0),tk=A.reduce((a,b)=>a+b.taken,0);
+  const bars=A.map(x=>{
+    const wd=GUNLER[(parse(x.d).getDay()+6)%7];
+    if(!x.exp) return `<div class="bar"><i class="none"></i>${wd}</div>`;
+    return `<div class="bar"><i style="height:${Math.max(6,Math.round(x.taken/x.exp*100))}%"></i>${wd}</div>`;
+  }).join('');
+  const dayTxt=m=>m.days.length===7?'Her gün':m.days.map(i=>GUNLER[i]).join(', ');
+  const list=S.meds.map(m=>`<button class="med" data-a="editMed" data-id="${m.id}">
+    <b>${esc(m.name)}</b>${m.dose?` <span class="sub">${esc(m.dose)}</span>`:''}
+    <div class="meta">${dayTxt(m)}${m.stock!=null?`, ${m.stock} doz kaldı`:''}${m.note?`. ${esc(m.note)}`:''}</div>
+    <div class="tchips">${m.times.map(t=>`<span>${t}</span>`).join('')}</div></button>`).join('');
+  return `<div class="head"><div><h1>İlaçlarım</h1><div class="sub">${S.meds.length} ilaç kayıtlı</div></div><button class="btn teal" data-a="newMed">Ekle</button></div>
+  ${exp?`<h3>Son 7 gün: %${Math.round(tk/exp*100)} uyum</h3><div class="bars">${bars}</div>`:''}
+  <h3>Liste</h3>
+  ${list||`<div class="empty"><p>İlaç eklediğinde saatleri burada görünür.</p><button class="btn teal" data-a="newMed">İlk ilacı ekle</button></div>`}
+  ${S.meds.length?`<button class="btn ghost block" style="margin-top:8px" data-a="ics">Telefon takvimine aktar (.ics)</button>
+  <p class="fine">Uygulama kapalıyken de alarm çalsın istiyorsan bu dosyayı takvimine ekle. Her ilaç, seçtiğin saatlerde tekrarlayan bir alarm olur.</p>`:''}`;
+}
+
+function renderCycle(){
+  const P=predict(),t=today(),y=calMonth.getFullYear(),m=calMonth.getMonth();
+  const off=(new Date(y,m,1).getDay()+6)%7,dim=new Date(y,m+1,0).getDate();
+  let cells='';
+  for(let i=0;i<off;i++) cells+='<span></span>';
+  for(let d=1;d<=dim;d++){
+    const ds=`${y}-${pad(m+1)}-${pad(d)}`,ty=dayType(ds,P,t),dd=S.day[ds];
+    const has=dd&&((dd.sym&&dd.sym.length)||dd.note||dd.flow);
+    cells+=`<button class="cell ${ty} ${ds===t?'today':''} ${ds===selDay?'sel':''}" data-a="pick" data-d="${ds}" aria-label="${long(ds)}"><span>${d}</span>${has?'<u></u>':''}</button>`;
+  }
+  let top='';
+  if(!P){
+    top=`<div class="panel"><b>Son regl ne zaman başladı?</b><input type="date" id="onb" max="${t}" value="${t}"><button class="btn berry block" style="margin-top:12px" data-a="onb">Kaydet</button><p class="fine">Bundan sonra tahminler otomatik hesaplanır. Daha çok döngü kaydettikçe ortalama netleşir.</p></div>`;
+  }else{
+    const c=P.c,np=P.list.find(p=>p.start>=t)||P.list[0];
+    top=`<div class="stats"><div><b>${c.avg} gün</b><span>${c.n?`Ortalama döngü (${c.n+1} kayıt)`:'Varsayılan döngü'}</span></div><div><b>${short(np.start)}</b><span>Sonraki regl</span></div><div><b>${short(np.ov)}</b><span>Yumurtlama</span></div></div>`;
+  }
+  /* seçili gün paneli */
+  const dd=S.day[selDay]||{},isP=!!S.periodDays[selDay],future=selDay>t;
+  let panel;
+  if(future){
+    const ty=dayType(selDay,P,t);
+    const txt={pred:'Tahmini regl günü.',fert:'Tahmini verimli dönem.',ov:'Tahmini yumurtlama günü.','':'Bu gün henüz gelmedi.'}[ty];
+    panel=`<div class="panel"><h2>${long(selDay)}</h2><p class="sub" style="margin-top:6px">${txt}</p></div>`;
+  }else{
+    panel=`<div class="panel"><h2>${long(selDay)}</h2>
+    <div class="row2" style="margin-top:14px"><b>Regl günü</b><button class="sw ${isP?'on':''}" data-a="togP" role="switch" aria-checked="${isP}" aria-label="Regl günü"></button></div>
+    ${isP?`<div class="lbl">Akış</div><div class="chips" style="margin-top:0">${FLOW.map(f=>`<button class="chip ${dd.flow===f?'on':''}" data-a="flow" data-v="${f}">${f}</button>`).join('')}</div>`:''}
+    <div class="lbl">Belirtiler</div><div class="chips" style="margin-top:0">${SYM.map(s=>`<button class="chip v ${(dd.sym||[]).includes(s)?'on':''}" data-a="sym" data-v="${s}">${s}</button>`).join('')}</div>
+    <label>Not<textarea id="note" placeholder="İstersen kısa bir not yaz">${esc(dd.note||'')}</textarea></label></div>`;
+  }
+  return `<div class="head"><div><h1>Döngü</h1><div class="sub">Takvim ve tahminler</div></div>${P&&!S.periodDays[t]?`<button class="btn berry" data-a="startToday">Regl başladı</button>`:''}</div>
+  ${top}
+  <div class="monthbar"><button class="ic" data-a="mprev" aria-label="Önceki ay">‹</button><h2>${AYLAR[m]} ${y}</h2><button class="ic" data-a="mnext" aria-label="Sonraki ay">›</button></div>
+  <div class="wk">${GUNLER.map(g=>`<span>${g}</span>`).join('')}</div>
+  <div class="grid">${cells}</div>
+  <div class="legend" style="margin-top:12px"><span><i style="background:var(--berry)"></i>Regl</span><span><i style="border:2px dashed var(--berry)"></i>Tahmini regl</span><span><i style="background:var(--violet-soft)"></i>Verimli dönem</span><span><i style="background:var(--violet)"></i>Yumurtlama</span></div>
+  ${panel}
+  <p class="fine">Tahminler geçmiş kayıtlarına dayanan ortalamalardır, tıbbi tavsiye ya da korunma yöntemi yerine geçmez. Düzensizlik ya da endişe varsa doktoruna danış.</p>`;
+}
+
+function renderSet(){
+  const s=S.settings,np=('Notification' in window)?Notification.permission:'yok',hasPush=PUSH_OK();
+  const pushStatus=s.push?'Açık. Uygulama kapalıyken de ilaç saatinde bildirim gelir':np==='denied'?'İzin kapalı. Telefon ayarlarından bu uygulamanın bildirimlerine izin ver':hasPush?'Kapalı':'Bu cihazda ya da bu açılışta kullanılamıyor. Uygulamayı ana ekrana ekleyip oradan aç (iOS 16.4 ve üstü)';
+  const stepper=(k,v)=>`<div class="step"><button data-a="step" data-k="${k}" data-v="-1" aria-label="Azalt">−</button><b>${v} gün</b><button data-a="step" data-k="${k}" data-v="1" aria-label="Artır">+</button></div>`;
+  return `<div class="head"><div><h1>Ayarlar</h1></div></div>
+  <div class="set"><label style="margin-top:0">Adın (isteğe bağlı)<input id="nm" value="${esc(s.name)}" placeholder="Karşılama için" autocomplete="off"></label></div>
+  <div class="set row2"><div><b>Ortalama döngü uzunluğu</b><small>${s.auto?'Otomatik hesaplanıyor, kayıt yoksa bu değer kullanılır':'Elle ayarlandı'}</small></div>${stepper('cycleLen',s.cycleLen)}</div>
+  <div class="set row2"><div><b>Otomatik hesapla</b><small>Kayıtlarından ortalama çıkarır</small></div><button class="sw ${s.auto?'on':''}" data-a="tgl" data-k="auto" role="switch" aria-checked="${s.auto}" aria-label="Otomatik hesapla"></button></div>
+  <div class="set row2"><div><b>Regl süresi</b></div>${stepper('periodLen',s.periodLen)}</div>
+  <h3>Hatırlatmalar</h3>
+  <div class="set row2"><div><b>Sesli ve titreşimli uyarı</b></div><button class="sw t ${s.sound?'on':''}" data-a="tgl" data-k="sound" role="switch" aria-checked="${s.sound}" aria-label="Sesli uyarı"></button></div>
+  <div class="set row2"><div><b>Arka plan bildirimleri</b><small>${pushStatus}</small></div>${s.push?`<div class="acts"><button class="btn ghost sm" data-a="testNotif">Dene</button><button class="btn ghost sm" data-a="pushOff">Kapat</button></div>`:(hasPush&&np!=='denied'?`<button class="btn teal sm" data-a="pushOn">Aç</button>`:'')}</div>
+  <p class="fine">Açınca ilaç saati geldiğinde uygulama kapalı olsa da bildirim gelir, işaretlemezsen 10 dakika sonra bir kez daha hatırlatılır. iPhone'da bunun için uygulamayı ana ekrana ekleyip oradan açman gerekir.</p>
+  <h3>Veriler</h3>
+  <div class="actions" style="margin-top:0"><button class="btn ghost sm" data-a="export">Yedekle</button><label class="btn ghost sm" style="margin:0;text-align:center;color:var(--ink)">Geri yükle<input type="file" id="import" accept="application/json"></label></div>
+  <button class="btn danger block" style="margin-top:12px" data-a="reset">${delArm==='reset'?'Emin misin? Tekrar dokun':'Tüm verileri sil'}</button>
+  <p class="fine">Verilerin yalnızca bu cihazda saklanır.</p>`;
+}
+
+/* ---------- çizim ---------- */
+function render(){
+  const main=$('#main'),sc=main.scrollTop;
+  main.innerHTML=({home:renderHome,meds:renderMeds,cycle:renderCycle,set:renderSet})[tab]();
+  main.scrollTop=sc;
+  $('#nav').innerHTML=TABS.map(([id,l,c])=>`<button class="${tab===id?'on':''}" style="--c:${c}" data-a="tab" data-t="${id}" aria-label="${l}">${ICON[id==='set'?'set':id]}${l}</button>`).join('');
+}
+
+/* ---------- ilaç formu ---------- */
+function openSheet(){ $('#sheet').innerHTML=sheetMed(); $('#sheetwrap').classList.add('open'); }
+function closeSheet(){ $('#sheetwrap').classList.remove('open'); draft=null; delArm=''; }
+function sheetMed(){
+  const d=draft;
+  return `<div class="grab"></div><h2>${d.id?'İlacı düzenle':'Yeni ilaç'}</h2>
+  <label>İlaç adı<input id="f-name" value="${esc(d.name)}" placeholder="Örn. D vitamini" autocomplete="off"></label>
+  <label>Doz<input id="f-dose" value="${esc(d.dose)}" placeholder="Örn. 1 tablet, 500 mg"></label>
+  <div class="lbl">Saatler</div>
+  ${d.times.map((t,i)=>`<div class="trow"><input type="time" class="f-time" value="${t}" aria-label="Saat ${i+1}">${d.times.length>1?`<button class="x" data-a="delTime" data-i="${i}" aria-label="Saati sil">✕</button>`:''}</div>`).join('')}
+  <button class="btn ghost sm" data-a="addTime">Saat ekle</button>
+  <div class="lbl">Günler</div>
+  <div class="days">${GUNLER.map((g,i)=>`<button class="dchip ${d.days.includes(i)?'on':''}" data-a="togDay" data-i="${i}">${g}</button>`).join('')}</div>
+  <div class="two"><label>Başlangıç<input type="date" id="f-start" value="${d.start}"></label><label>Bitiş (isteğe bağlı)<input type="date" id="f-end" value="${d.end||''}"></label></div>
+  <label>Kalan doz sayısı (isteğe bağlı)<input type="number" inputmode="numeric" min="0" id="f-stock" value="${d.stock??''}" placeholder="Azalınca uyarırım"></label>
+  <label>Not<input id="f-note" value="${esc(d.note)}" placeholder="Örn. Yemekten sonra"></label>
+  <div class="actions">${d.id?`<button class="btn danger" data-a="delMed">${delArm==='med'?'Emin misin?':'Sil'}</button>`:`<button class="btn ghost" data-a="closeSheet">Vazgeç</button>`}<button class="btn teal" data-a="saveMed">Kaydet</button></div>`;
+}
+function syncDraft(){
+  if(!draft) return;
+  draft.name=$('#f-name').value; draft.dose=$('#f-dose').value;
+  draft.times=[...document.querySelectorAll('.f-time')].map(i=>i.value);
+  draft.start=$('#f-start').value; draft.end=$('#f-end').value;
+  draft.stock=$('#f-stock').value; draft.note=$('#f-note').value;
+}
+function saveMed(){
+  syncDraft(); const d=draft;
+  const name=d.name.trim(); if(!name) return toast('İlaç adını yaz');
+  const times=[...new Set(d.times.filter(Boolean))].sort(); if(!times.length) return toast('En az bir saat seç');
+  if(!d.days.length) return toast('En az bir gün seç');
+  if(!d.start) d.start=today(); if(d.end&&d.end<d.start) return toast('Bitiş, başlangıçtan önce olamaz');
+  const stock=d.stock===''||d.stock==null?null:Math.max(0,parseInt(d.stock,10)||0);
+  const obj={id:d.id||'m'+Date.now(),name,dose:d.dose.trim(),times,days:[...d.days].sort(),start:d.start,end:d.end||'',stock,note:d.note.trim()};
+  const i=S.meds.findIndex(m=>m.id===obj.id); if(i>=0) S.meds[i]=obj; else S.meds.push(obj);
+  persist(); closeSheet(); render(); toast('İlaç kaydedildi');
+}
+
+/* ---------- hatırlatma motoru ---------- */
+let ac;
+function beep(){
+  try{
+    ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    [0,.35].forEach(o=>{
+      const osc=ac.createOscillator(),g=ac.createGain(); osc.connect(g); g.connect(ac.destination); osc.frequency.value=880;
+      const t0=ac.currentTime+o; g.gain.setValueAtTime(.0001,t0); g.gain.exponentialRampToValueAtTime(.25,t0+.03); g.gain.exponentialRampToValueAtTime(.0001,t0+.3);
+      osc.start(t0); osc.stop(t0+.32);
+    });
+  }catch(e){}
+}
+function notify(s){
+  if(S.settings.sound){beep(); if(navigator.vibrate) navigator.vibrate([200,100,200]);}
+  if(S.settings.notif&&!S.settings.push&&'Notification' in window&&Notification.permission==='granted'){
+    try{ new Notification('İlaç vakti: '+s.m.name,{body:s.m.dose||'Dozunu almayı unutma',tag:s.key}); }catch(e){}
+  }
+}
+function showAlert(s){
+  alertOpen=s;
+  $('#alert').innerHTML=`<div class="abox" role="alertdialog" aria-label="İlaç vakti"><div class="sub">İlaç vakti</div><div class="big">${s.t}</div>
+  <h2>${esc(s.m.name)}</h2><p class="sub">${esc(s.m.dose||'')}${s.m.note?(s.m.dose?'. ':'')+esc(s.m.note):''}</p>
+  <div class="actions"><button class="btn teal" data-a="aTake">Aldım</button><button class="btn ghost" data-a="aSnooze">10 dakika sonra hatırlat</button><button class="btn ghost" data-a="aSkip">Atla</button></div></div>`;
+  $('#alert').classList.add('open'); notify(s);
+}
+function closeAlert(){ $('#alert').classList.remove('open'); alertOpen=null; render(); }
+function tick(){
+  const t=today(),nm=nowMin();
+  if(!alertOpen){
+    const due=slotsFor(t).find(s=>!getLog(t,s.key)&&tmin(s.t)<=nm&&nm-tmin(s.t)<=90&&!fired[t+s.key]&&!(snooze[s.key]>Date.now()));
+    if(due){fired[t+due.key]=1; showAlert(due);}
+  }
+  if(nm!==lastRenderMin){ lastRenderMin=nm; if(tab==='home'&&!alertOpen&&!$('#sheetwrap').classList.contains('open')) render(); }
+}
+
+/* ---------- dışa aktarım ---------- */
+function download(name,text,type){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  toast('Dosya hazırlandı');
+}
+function makeICS(){
+  const D=['MO','TU','WE','TH','FR','SA','SU'],n=new Date(),
+  stamp=`${n.getUTCFullYear()}${pad(n.getUTCMonth()+1)}${pad(n.getUTCDate())}T${pad(n.getUTCHours())}${pad(n.getUTCMinutes())}00Z`;
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Duzen//TR//EN','CALSCALE:GREGORIAN'];
+  S.meds.forEach(m=>m.times.forEach(t=>{
+    let rr=m.days.length===7?'FREQ=DAILY':'FREQ=WEEKLY;BYDAY='+m.days.map(i=>D[i]).join(',');
+    if(m.end) rr+=';UNTIL='+m.end.replace(/-/g,'')+'T235959';
+    const nm=(m.name+(m.dose?' ('+m.dose+')':'')).replace(/[,;\n]/g,' ');
+    L.push('BEGIN:VEVENT','UID:'+m.id+'-'+t.replace(':','')+'@duzen','DTSTAMP:'+stamp,
+      'DTSTART:'+m.start.replace(/-/g,'')+'T'+t.replace(':','')+'00','DURATION:PT10M','RRULE:'+rr,
+      'SUMMARY:İlaç: '+nm,'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:İlaç vakti','END:VALARM','END:VEVENT');
+  }));
+  L.push('END:VCALENDAR'); return L.join('\r\n');
+}
+
+/* ---------- arka plan bildirimi (web push) ---------- */
+const PUSH_OK=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&location.protocol==='https:';
+const b64=u=>{const s=(u+'='.repeat((4-u.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/'),r=atob(s);return Uint8Array.from([...r].map(c=>c.charCodeAt(0)))};
+let syncT;
+const pushSync=()=>{clearTimeout(syncT);syncT=setTimeout(doSync,800)};
+async function doSync(){
+  if(!S.settings.push||!PUSH_OK()) return false;
+  try{
+    const reg=await navigator.serviceWorker.ready, sub=await reg.pushManager.getSubscription(); if(!sub) return false;
+    const t=today(),y=addDays(t,-1),done=[];
+    [t,y].forEach(d=>Object.keys(S.log[d]||{}).forEach(k=>done.push(d+'|'+k)));
+    const r=await fetch('/api/push-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      subscription:sub.toJSON(),tz:Intl.DateTimeFormat().resolvedOptions().timeZone,
+      meds:S.meds.map(m=>({id:m.id,name:m.name,dose:m.dose,times:m.times,days:m.days,start:m.start,end:m.end})),done})});
+    return r.ok;
+  }catch(e){console.error(e);return false;}
+}
+async function enablePush(){
+  try{
+    if(!PUSH_OK()) return toast('Bu açılışta arka plan bildirimi yok. Ana ekrana ekleyip oradan aç');
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){render();return toast('İzin verilmedi');}
+    S.settings.notif=true;
+    const reg=await navigator.serviceWorker.register('/sw.js'); await navigator.serviceWorker.ready;
+    const {publicKey}=await (await fetch('/api/push-key')).json(), want=b64(publicKey);
+    let sub=await reg.pushManager.getSubscription();
+    if(sub){const cur=new Uint8Array(sub.options.applicationServerKey||[]); if(cur.length!==want.length||cur.some((v,i)=>v!==want[i])){await sub.unsubscribe();sub=null;}}
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:want});
+    S.settings.push=true;
+    if(!(await doSync())){S.settings.push=false; persist(); render(); return toast('Sunucuya bağlanılamadı, tekrar dene');}
+    persist(); render(); toast('Arka plan bildirimleri açıldı');
+  }catch(e){console.error(e); toast('Açılamadı: '+(e.message||'hata'));}
+}
+async function pushUnsub(){
+  try{
+    const reg=await navigator.serviceWorker.ready, sub=await reg.pushManager.getSubscription();
+    if(sub){
+      await fetch('/api/push-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON(),unsubscribe:true})}).catch(()=>{});
+      await sub.unsubscribe();
+    }
+  }catch(e){console.error(e);}
+}
+async function disablePush(){ await pushUnsub(); S.settings.push=false; persist(); render(); toast('Arka plan bildirimleri kapatıldı'); }
+async function testNotif(){
+  try{ const reg=await navigator.serviceWorker.ready; await reg.showNotification('Düzen',{body:'Bildirimler çalışıyor',icon:'/icon-192.png'}); }
+  catch(e){ try{ new Notification('Düzen',{body:'Bildirimler çalışıyor'}); }catch(_){ toast('Bildirim gösterilemedi'); } }
+}
+
+/* ---------- olaylar ---------- */
+document.addEventListener('click',e=>{
+  if(e.target.id==='sheetwrap'){closeSheet();return;}
+  const el=e.target.closest('[data-a]'); if(!el) return;
+  const a=el.dataset.a,D=el.dataset,t=today();
+  switch(a){
+    case 'tab': tab=D.t; delArm=''; render(); $('#main').scrollTop=0; break;
+    case 'take': case 'skip': {
+      const s=slotsFor(t).find(x=>x.key===D.k); if(s){setLog(t,s.key,a==='take'?'taken':'skipped',s.m); render();} break; }
+    case 'undo': { const s=slotsFor(t).find(x=>x.key===D.k); if(s){setLog(t,s.key,null,s.m); render();} break; }
+    case 'aTake': case 'aSkip': { const s=alertOpen; if(s){setLog(t,s.key,a==='aTake'?'taken':'skipped',s.m);} closeAlert(); break; }
+    case 'aSnooze': { const s=alertOpen; if(s){snooze[s.key]=Date.now()+10*60000; delete fired[t+s.key];} closeAlert(); toast('10 dakika sonra tekrar hatırlatacağım'); break; }
+
+    case 'newMed': draft={id:null,name:'',dose:'',times:['08:00'],days:[0,1,2,3,4,5,6],start:t,end:'',stock:'',note:''}; openSheet(); break;
+    case 'editMed': { const m=S.meds.find(x=>x.id===D.id); draft={...m,times:[...m.times],days:[...m.days]}; delArm=''; openSheet(); break; }
+    case 'closeSheet': closeSheet(); break;
+    case 'addTime': syncDraft(); draft.times.push('12:00'); openSheet(); break;
+    case 'delTime': syncDraft(); draft.times.splice(+D.i,1); openSheet(); break;
+    case 'togDay': { syncDraft(); const i=+D.i,k=draft.days.indexOf(i); k>=0?draft.days.splice(k,1):draft.days.push(i); openSheet(); break; }
+    case 'saveMed': saveMed(); break;
+    case 'delMed':
+      if(delArm!=='med'){syncDraft(); delArm='med'; openSheet();}
+      else{ S.meds=S.meds.filter(m=>m.id!==draft.id); persist(); closeSheet(); render(); toast('İlaç silindi'); }
+      break;
+    case 'ics': download('duzen-ilac-alarmlari.ics',makeICS(),'text/calendar'); break;
+
+    case 'startToday': startPeriod(t); selDay=t; render(); toast('Regl başlangıcı kaydedildi'); break;
+    case 'contYes': S.periodDays[t]=true; persist(); render(); break;
+    case 'contNo': S.dismissed=t; persist(); render(); break;
+    case 'onb': { const v=$('#onb').value; if(!v||v>t) return toast('Geçerli bir tarih seç'); startPeriod(v); calMonth=parse(v); calMonth.setDate(1); render(); toast('Kaydedildi, tahminler hazır'); break; }
+    case 'pick': selDay=D.d; render(); break;
+    case 'mprev': calMonth.setMonth(calMonth.getMonth()-1); render(); break;
+    case 'mnext': calMonth.setMonth(calMonth.getMonth()+1); render(); break;
+    case 'togP': { if(S.periodDays[selDay]) delete S.periodDays[selDay]; else S.periodDays[selDay]=true; persist(); render(); break; }
+    case 'flow': { const o=S.day[selDay]=S.day[selDay]||{}; o.flow=o.flow===D.v?'':D.v; persist(); render(); break; }
+    case 'sym': { const o=S.day[selDay]=S.day[selDay]||{}; o.sym=o.sym||[]; const k=o.sym.indexOf(D.v); k>=0?o.sym.splice(k,1):o.sym.push(D.v); persist(); render(); break; }
+
+    case 'step': { const k=D.k,lim=k==='cycleLen'?[20,45]:[2,10]; S.settings[k]=Math.min(lim[1],Math.max(lim[0],S.settings[k]+ +D.v)); if(k==='cycleLen') S.settings.auto=false; persist(); render(); break; }
+    case 'tgl': S.settings[D.k]=!S.settings[D.k]; persist(); render(); break;
+    case 'pushOn': enablePush(); break;
+    case 'pushOff': disablePush(); break;
+    case 'testNotif': testNotif(); break;
+    case 'export': download('duzen-yedek-'+t+'.json',JSON.stringify(S,null,1),'application/json'); break;
+    case 'reset':
+      if(delArm!=='reset'){delArm='reset'; render();}
+      else{ if(S.settings.push) pushUnsub(); S={meds:[],log:{},periodDays:{},day:{},dismissed:'',settings:{name:'',cycleLen:28,periodLen:5,auto:true,sound:true,notif:false}}; delArm=''; persist(); render(); toast('Tüm veriler silindi'); }
+      break;
+  }
+});
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el.id==='note'){ const o=S.day[selDay]=S.day[selDay]||{}; o.note=el.value; persist(); }
+  else if(el.id==='nm'){ S.settings.name=el.value.trim(); persist(); }
+  else if(el.id==='import'&&el.files[0]){
+    const r=new FileReader();
+    r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d||!Array.isArray(d.meds)) throw 0; S={...S,...d,settings:{...S.settings,...(d.settings||{})}}; persist(); render(); toast('Yedek yüklendi'); }catch(err){ toast('Dosya okunamadı'); } };
+    r.readAsText(el.files[0]);
+  }
+});
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) tick(); });
+
+/* ---------- başlat ---------- */
+(async function init(){
+  const d=await store.load();
+  if(d) S={...S,...d,settings:{...S.settings,...(d.settings||{})}};
+  render(); tick(); setInterval(tick,15000);
+  if('serviceWorker' in navigator&&location.protocol==='https:'){ navigator.serviceWorker.register('/sw.js').catch(()=>{}); if(S.settings.push) pushSync(); }
+})();
+</script>
+</body>
+</html>
