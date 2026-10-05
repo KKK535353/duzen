@@ -14,6 +14,14 @@ export async function vapid(s) {
   return v;
 }
 
+// Bildirim servisi "bu kayıt geçersiz" (404/410) derse kişinin kaydı silinir; yeniden kayıt olabilmesi ve
+// panelde görünebilmesi için işaret bırakılır
+export async function markStale(s, pid, rec) {
+  try {
+    await s.setJSON("stale/" + pid, { ts: Date.now(), name: [rec && rec.name, rec && rec.surname].filter(Boolean).join(" ") });
+  } catch { /* günlük tutulamazsa silme yine de geçerli */ }
+}
+
 export const idOf = (endpoint) =>
   createHash("sha256").update(endpoint).digest("hex").slice(0, 32);
 

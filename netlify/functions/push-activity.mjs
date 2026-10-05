@@ -103,8 +103,18 @@ export default async (req) => {
     });
   }
 
+  // Bildirim kaydı geçersiz olduğu için silinenler (kişi uygulamayı açıp kaydı yenileyene kadar listelenir)
+  const stale = [];
+  for (const { key } of (await s.list({ prefix: "stale/" })).blobs) {
+    const st = await s.get(key, { type: "json" });
+    if (!st || now - st.ts > 30 * 864e5) continue;
+    const renewed = people.some((p) => p.name && p.name === st.name && (p.updated || 0) > st.ts);
+    if (!renewed) stale.push({ name: st.name || "İsimsiz", ts: st.ts });
+  }
+  stale.sort((a, c) => c.ts - a.ts);
+
   return Response.json({
-    ok: true, people, broadcasts,
+    ok: true, people, broadcasts, stale,
     totals: {
       people: people.length,
       openedToday: people.filter((p) => p.opensToday > 0).length,

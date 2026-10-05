@@ -129,6 +129,8 @@ button:disabled{opacity:.6}
   <div id="logBox"></div>
   <div class="h3" id="bcHead" style="display:none">Son duyurular</div>
   <div id="bcList"></div>
+  <div class="h3" id="stHead" style="display:none">Bildirim kaydı geçersiz olanlar</div>
+  <div id="stList"></div>
   <div class="h3" id="ppHead" style="display:none">Kişiler</div>
   <div id="ppList"></div>
 </section>
@@ -353,11 +355,14 @@ async function loadActivity(){
     if(x.openedNames.length) r.appendChild(mk('small',null,'Açanlar: '+x.openedNames.join(', ')));
     bl.appendChild(r);
   });
+  const sl=$('stList'); sl.textContent=''; $('stHead').style.display=(d.stale&&d.stale.length)?'block':'none';
+  (d.stale||[]).forEach(x=>{ const r=mk('div','row bad'); r.appendChild(mk('b',null,x.name)); r.appendChild(mk('small',null,'Bildirim servisi kaydı geçersiz saydı ('+ago2(x.ts)+'), kayıt silindi. Kişi uygulamayı bir kez açınca kendiliğinden yenilenir. Yenilenmezse Ayarlar\'dan bildirimi kapatıp tekrar açması gerekir.')); sl.appendChild(r); });
   const pl=$('ppList'); pl.textContent=''; $('ppHead').style.display='block';
   if(!d.people.length) pl.appendChild(mk('p','sub','Kayıtlı kimse yok.'));
   d.people.forEach(p=>{
-    const r=mk('div','row'); r.appendChild(mk('b',null,p.name||'İsimsiz'));
-    r.appendChild(mk('small',null,'Son açılış: '+ago2(p.lastOpen||p.updated)));
+    const lastT=p.lastOpen||p.updated, stale10=lastT&&(Date.now()-lastT)>10*864e5;
+    const r=mk('div','row'+(stale10?' warn':'')); r.appendChild(mk('b',null,p.name||'İsimsiz'));
+    r.appendChild(mk('small',null,'Son açılış: '+ago2(lastT)+(stale10?'. 10 günden uzun süredir açmadı':'')));
     r.appendChild(mk('small',null,'Bugün '+p.opensToday+' açılış ('+p.notifsToday+' bildirimden), 7 günde '+p.opens7+' açılış ('+p.notifs7+' bildirimden)'));
     if(p.lastNotif) r.appendChild(mk('small',null,'Son bildirime dokunma: '+p.lastNotif.kind+', '+ago2(p.lastNotif.ts)));
     const del=mk('button','del','Sil'); del.type='button';

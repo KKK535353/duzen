@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { store, vapid, webpush } from "../lib/push.mjs";
+import { store, vapid, webpush, markStale } from "../lib/push.mjs";
 
 const same = (a, b) => {
   const x = Buffer.from(String(a)), y = Buffer.from(String(b));
@@ -46,7 +46,7 @@ export default async (req) => {
         sent++;
         okPids.push(key.slice(4));
       } catch (e) {
-        if (e.statusCode === 404 || e.statusCode === 410) { await s.delete(key); removed++; }
+        if (e.statusCode === 404 || e.statusCode === 410) { await s.delete(key); await markStale(s, key.slice(4), rec); removed++; }
         else { failed++; console.error("broadcast error", e.statusCode, e.body); }
       }
     }));

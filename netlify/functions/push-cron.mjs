@@ -1,4 +1,4 @@
-import { store, vapid, webpush, localNow } from "../lib/push.mjs";
+import { store, vapid, webpush, localNow, markStale } from "../lib/push.mjs";
 
 const enc = encodeURIComponent;
 const infoUrl = (t, b) => `/?t=${enc(t)}&b=${enc(b)}`;
@@ -44,7 +44,7 @@ export default async () => {
         entries.push({ ...e0, res: "ok" });
       } catch (e) {
         if (e.statusCode === 404 || e.statusCode === 410) {
-          await s.delete(key); await s.delete("assigned/" + pid);
+          await s.delete(key); await s.delete("assigned/" + pid); await markStale(s, pid, rec);
           return false;
         }
         console.error("push error", e.statusCode, e.body);

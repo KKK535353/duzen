@@ -1,4 +1,4 @@
-import { webpush, vapid, localNow } from "./push.mjs";
+import { webpush, vapid, localNow, markStale } from "./push.mjs";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 const MGM_HEADERS = {
@@ -211,7 +211,7 @@ export async function sendToPids(s, pids, payload) {
       await webpush.sendNotification(rec.sub, JSON.stringify(payload), { TTL: 3600 });
       sent++;
     } catch (e) {
-      if (e && (e.statusCode === 404 || e.statusCode === 410)) { await s.delete("sub/" + pid); await s.delete("assigned/" + pid); removed++; }
+      if (e && (e.statusCode === 404 || e.statusCode === 410)) { await s.delete("sub/" + pid); await s.delete("assigned/" + pid); await markStale(s, pid, rec); removed++; }
       else { failed++; console.error("weather push error", e && e.statusCode); }
     }
   }

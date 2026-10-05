@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { store, vapid, webpush } from "../lib/push.mjs";
+import { store, vapid, webpush, markStale } from "../lib/push.mjs";
 
 const same = (a, b) => {
   const x = Buffer.from(String(a)), y = Buffer.from(String(b));
@@ -78,7 +78,7 @@ export default async (req) => {
         }), { TTL: 3600 });
         notified++;
       } catch (e) {
-        if (e.statusCode === 404 || e.statusCode === 410) { await s.delete("sub/" + pid); await s.delete("assigned/" + pid); }
+        if (e.statusCode === 404 || e.statusCode === 410) { await s.delete("sub/" + pid); await s.delete("assigned/" + pid); await markStale(s, pid, sub); }
       }
     }
     return json({ ok: true, count, skipped, notified });

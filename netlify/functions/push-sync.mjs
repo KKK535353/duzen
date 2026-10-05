@@ -27,6 +27,9 @@ export default async (req) => {
 
   if (await s.get("removed/" + id, { type: "json" })) return Response.json({ removed: true }, { status: 403 });
 
+  // Bu bildirim kaydı daha önce geçersiz çıkmış: aynı kaydı yeniden oluşturma, uygulamaya aboneliği yenilemesini söyle
+  if (await s.get("stale/" + id, { type: "json" })) return Response.json({ ok: true, resubscribe: true });
+
   const old = await s.get("sub/" + id, { type: "json" });
   if (!old) {
     const { blobs } = await s.list({ prefix: "sub/" });
