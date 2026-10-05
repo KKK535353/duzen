@@ -1,4 +1,4 @@
-import { webpush, vapid } from "./push.mjs";
+import { webpush, vapid, localNow } from "./push.mjs";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 const MGM_HEADERS = {
@@ -18,21 +18,28 @@ const MGM_CODES = {
   SCK: "Sıcak", SGK: "Soğuk", KF: "Toz veya kum fırtınalı",
 };
 const MGM_WET = new Set(["HY", "Y", "KY", "HSY", "SY", "KSY", "MSY", "GSY", "KGY", "KKY", "DY", "K", "HKY", "YKY"]);
+const MGM_ICON = {
+  A: "☀️", AB: "🌤️", PB: "⛅", CB: "☁️",
+  HY: "🌧️", Y: "🌧️", KY: "🌧️", HSY: "🌦️", SY: "🌦️", KSY: "🌧️", MSY: "🌦️", GSY: "⛈️", KGY: "⛈️",
+  KKY: "🌨️", HKY: "❄️", K: "❄️", YKY: "❄️", DY: "🌨️",
+  D: "🌫️", SIS: "🌫️", PUS: "🌫️", R: "💨", GKR: "💨", KKR: "💨", SCK: "☀️", SGK: "❄️", KF: "🌪️",
+};
+export const WINDY = 35; // km/sa ve üstü: rüzgar işareti
 
 function wmo(code) {
-  if (code === 0) return ["Açık", false];
-  if (code === 1) return ["Az bulutlu", false];
-  if (code === 2) return ["Parçalı bulutlu", false];
-  if (code === 3) return ["Çok bulutlu", false];
-  if (code === 45 || code === 48) return ["Sisli", false];
-  if (code >= 51 && code <= 57) return ["Çiseleyen yağmur", true];
-  if (code >= 61 && code <= 65) return ["Yağmurlu", true];
-  if (code === 66 || code === 67) return ["Dondurucu yağmur", true];
-  if (code >= 71 && code <= 77) return ["Kar yağışlı", true];
-  if (code >= 80 && code <= 82) return ["Sağanak yağışlı", true];
-  if (code === 85 || code === 86) return ["Kar sağanağı", true];
-  if (code >= 95) return ["Gök gürültülü fırtına", true];
-  return ["Değişken hava", false];
+  if (code === 0) return ["Açık", false, "☀️"];
+  if (code === 1) return ["Az bulutlu", false, "🌤️"];
+  if (code === 2) return ["Parçalı bulutlu", false, "⛅"];
+  if (code === 3) return ["Çok bulutlu", false, "☁️"];
+  if (code === 45 || code === 48) return ["Sisli", false, "🌫️"];
+  if (code >= 51 && code <= 57) return ["Çiseleyen yağmur", true, "🌦️"];
+  if (code >= 61 && code <= 65) return ["Yağmurlu", true, "🌧️"];
+  if (code === 66 || code === 67) return ["Dondurucu yağmur", true, "🌧️"];
+  if (code >= 71 && code <= 77) return ["Kar yağışlı", true, "❄️"];
+  if (code >= 80 && code <= 82) return ["Sağanak yağışlı", true, "🌧️"];
+  if (code === 85 || code === 86) return ["Kar sağanağı", true, "❄️"];
+  if (code >= 95) return ["Gök gürültülü fırtına", true, "⛈️"];
+  return ["Değişken hava", false, "🌤️"];
 }
 
 async function getJson(url, ms, headers) {
@@ -49,9 +56,23 @@ const num = (v, lo, hi) => {
   if (!Number.isFinite(n) || n < lo || n > hi) throw new Error("geçersiz değer");
   return n;
 };
+const addD = (s, n) => { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
-// Meteoroloji Genel Müdürlüğü (sitesinin kendi servisi; resmî, belgeli bir API değil)
-export async function fetchMGM() {
+function mgmDay(d, n) {
+  if (d["hadiseGun" + n] == null) return null;
+  const code = String(d["hadiseGun" + n]);
+  const wind = d["ruzgarHizGun" + n] != null ? Math.round(num(d["ruzgarHizGun" + n], 0, 300)) : null;
+  return {
+    code, cond: MGM_CODES[code] || "Hava durumu", icon: MGM_ICON[code] || "🌤️", wet: MGM_WET.has(code),
+    low: num(d["enDusukGun" + n], -60, 60), high: num(d["enYuksekGun" + n], -60, 60), wind,
+    humMin: d["enDusukNemGun" + n] != null ? num(d["enDusukNemGun" + n], 0, 100) : null,
+    humMax: d["enYuksekNemGun" + n] != null ? num(d["enYuksekNemGun" + n], 0, 100) : null,
+    pop: null,
+  };
+}
+
+// Meteoroloji Genel Müdürlüğü: sitesinin kendi servisi (resmî, belgeli bir API değil). Bugünden başlayan 5 gün.
+export async function fetchMGMDays() {
   const centers = await getJson("https://servis.mgm.gov.tr/web/merkezler?il=istanbul", 5000, MGM_HEADERS);
   const c = Array.isArray(centers) ? centers[0] : null;
   if (!c) throw new Error("merkez bulunamadı");
@@ -63,38 +84,45 @@ export async function fetchMGM() {
     } catch { /* sıradaki kimliği dene */ }
   }
   if (!d) throw new Error("günlük tahmin alınamadı");
-  const code = String(d.hadiseGun1);
-  return {
-    source: "MGM",
-    cond: MGM_CODES[code] || "Hava durumu",
-    wet: MGM_WET.has(code),
-    low: num(d.enDusukGun1, -60, 60),
-    high: num(d.enYuksekGun1, -60, 60),
-    wind: d.ruzgarHizGun1 != null ? Math.round(num(d.ruzgarHizGun1, 0, 300)) : null,
-    humMin: d.enDusukNemGun1 != null ? num(d.enDusukNemGun1, 0, 100) : null,
-    humMax: d.enYuksekNemGun1 != null ? num(d.enYuksekNemGun1, 0, 100) : null,
-    pop: null,
-  };
+  const out = [];
+  for (let n = 1; n <= 5; n++) { try { const x = mgmDay(d, n); if (x) out.push({ offset: n - 1, ...x }); } catch { /* o gün atlanır */ } }
+  if (!out.some((x) => x.offset === 0)) throw new Error("bugünün tahmini yok");
+  return out;
+}
+export async function fetchMGM() {
+  const t = (await fetchMGMDays()).find((x) => x.offset === 0);
+  return { source: "MGM", ...t };
 }
 
 // Yedek kaynak: Open-Meteo (ücretsiz, anahtarsız, ticari olmayan kullanım için)
-export async function fetchOpenMeteo() {
+export async function fetchOMDays(past = 5, forecast = 10) {
   const url = "https://api.open-meteo.com/v1/forecast?latitude=41.0082&longitude=28.9784"
     + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max"
-    + "&timezone=Europe%2FIstanbul&forecast_days=1";
+    + `&timezone=Europe%2FIstanbul&past_days=${past}&forecast_days=${forecast}`;
   const j = await getJson(url, 6000, { "User-Agent": UA });
   const d = j && j.daily;
-  if (!d || !d.temperature_2m_max) throw new Error("veri yok");
-  const [cond, wet] = wmo(Number(d.weather_code && d.weather_code[0]));
-  const pop = d.precipitation_probability_max && d.precipitation_probability_max[0];
-  return {
-    source: "Open-Meteo", cond, wet,
-    low: Math.round(num(d.temperature_2m_min[0], -60, 60)),
-    high: Math.round(num(d.temperature_2m_max[0], -60, 60)),
-    wind: d.wind_speed_10m_max && d.wind_speed_10m_max[0] != null ? Math.round(num(d.wind_speed_10m_max[0], 0, 300)) : null,
-    humMin: null, humMax: null,
-    pop: pop != null ? Math.round(num(pop, 0, 100)) : null,
-  };
+  if (!d || !d.temperature_2m_max || !d.time) throw new Error("veri yok");
+  const out = [];
+  for (let i = 0; i < d.time.length; i++) {
+    try {
+      const [cond, wet, icon] = wmo(Number(d.weather_code && d.weather_code[i]));
+      const pop = d.precipitation_probability_max && d.precipitation_probability_max[i];
+      out.push({
+        date: d.time[i], cond, wet, icon,
+        low: Math.round(num(d.temperature_2m_min[i], -60, 60)), high: Math.round(num(d.temperature_2m_max[i], -60, 60)),
+        wind: d.wind_speed_10m_max && d.wind_speed_10m_max[i] != null ? Math.round(num(d.wind_speed_10m_max[i], 0, 300)) : null,
+        humMin: null, humMax: null, pop: pop != null ? Math.round(num(pop, 0, 100)) : null,
+      });
+    } catch { /* o gün atlanır */ }
+  }
+  if (!out.length) throw new Error("veri yok");
+  return out;
+}
+export async function fetchOpenMeteo() {
+  const today = localNow("Europe/Istanbul").date;
+  const days = await fetchOMDays(0, 1);
+  const t = days.find((x) => x.date === today) || days[0];
+  return { source: "Open-Meteo", ...t };
 }
 
 export async function getForecast() {
@@ -102,6 +130,37 @@ export async function getForecast() {
   try { return await fetchMGM(); } catch (e) { errs.push("MGM: " + (e && e.message)); }
   try { const f = await fetchOpenMeteo(); f.note = errs.join("; "); return f; } catch (e) { errs.push("Open-Meteo: " + (e && e.message)); }
   throw new Error(errs.join(" | "));
+}
+
+// Ana sayfa için Pazartesi-Cuma haftası (Cumartesi/Pazar günleri gelecek haftanın Pzt-Cuma'sı)
+export async function getWeek() {
+  const today = localNow("Europe/Istanbul").date;
+  const dow = new Date(today + "T00:00:00Z").getUTCDay();   // 0 Pazar
+  const monday = addD(today, dow === 0 ? 1 : dow === 6 ? 2 : 1 - dow);
+  const targets = [0, 1, 2, 3, 4].map((i) => addD(monday, i));
+  const errs = [];
+  let mgm = null, om = null;
+  try { mgm = await fetchMGMDays(); } catch (e) { errs.push("MGM: " + (e && e.message)); }
+  const by = {};
+  if (mgm) mgm.forEach((x) => { by[addD(today, x.offset)] = { ...x, src: "MGM" }; });
+  if ([...targets, today].some((d) => !by[d])) {          // geçmiş günler ve MGM'nin 5 gününü aşanlar için
+    try { om = await fetchOMDays(); } catch (e) { errs.push("Open-Meteo: " + (e && e.message)); }
+  }
+  const omBy = {};
+  (om || []).forEach((x) => { omBy[x.date] = { ...x, src: "Open-Meteo" }; });
+  if (!mgm && !om) throw new Error(errs.join(" | "));
+  const pick = (d) => by[d] || omBy[d] || null;
+  const labels = ["Pzt", "Sal", "Çar", "Per", "Cum"];
+  const view = (x) => ({
+    icon: x.icon, cond: x.cond, low: x.low, high: x.high, wind: x.wind, wet: x.wet,
+    windy: x.wind != null && x.wind >= WINDY, humMin: x.humMin, humMax: x.humMax, pop: x.pop, src: x.src,
+  });
+  const week = targets.map((d, i) => {
+    const x = pick(d);
+    return { date: d, label: labels[i], today: d === today, past: d < today, na: !x, ...(x ? view(x) : {}) };
+  });
+  const t = pick(today);
+  return { today, monday, week, now: t ? view(t) : null, note: errs.join("; ") };
 }
 
 export function buildMessage(f) {
