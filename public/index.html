@@ -186,6 +186,15 @@ input[type=file]{display:none}
 .ibt{font-size:12px;color:var(--ink2);min-width:40px;padding-top:2px}
 .ibi b{display:block;font-size:14px}
 .ibi span:not(.ibt){font-size:13px;color:var(--ink2);display:block}
+.bell{position:relative;flex:none;width:44px;height:44px;border-radius:50%;border:0;background:var(--surf);color:var(--ink);box-shadow:0 1px 0 var(--line);display:flex;align-items:center;justify-content:center}
+.bell svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.bell i{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;border-radius:10px;background:var(--berry);color:#fff;font:700 11px/19px system-ui,sans-serif;font-style:normal;text-align:center;padding:0 5px}
+.hd{font-size:13px;font-weight:700;color:var(--ink2);margin:14px 0 4px}
+.hi{display:flex;gap:10px;width:100%;text-align:left;background:transparent;border:0;border-top:1px solid var(--line);padding:9px 6px;color:inherit;border-radius:8px}
+.hi.new{background:var(--violet-soft)}
+.hi .ht{font-size:13px;color:var(--ink2);min-width:42px;padding-top:2px;font-variant-numeric:tabular-nums}
+.hi b{display:block;font-size:14.5px}
+.hi span:not(.ht){display:block;font-size:13.5px;color:var(--ink2)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -428,7 +437,7 @@ function renderHome(){
   }
   const courses=S.meds.map(m=>({m,ci:courseInfo(m)})).filter(x=>x.ci&&(x.ci.state==='run'||(x.ci.state!=='soon'&&diff(t,x.m.end)>=0&&diff(t,x.m.end)<=2)));
   const courseHome=courses.length?`<h3>Tedavi ilerlemesi</h3>${courses.map(({m,ci})=>`<div class="course" style="margin-top:6px">${ringSvg(ci)}<div class="clg"><b>${esc(m.name)}</b>${courseLegend(ci,m)}</div></div>`).join('')}`:'';
-  return `<div class="head"><div><h1>${greeting()}</h1><div class="sub">${long(t)}</div></div></div>
+  return `<div class="head"><div><h1>${greeting()}</h1><div class="sub">${long(t)}</div></div><button class="bell" data-a="inboxHist" aria-label="Bildirimler${inboxList.length?`, ${inboxList.length} yeni`:''}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17h12l-1.5-2V10a4.5 4.5 0 0 0-9 0v5z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>${inboxList.length?`<i>${inboxList.length>9?'9+':inboxList.length}</i>`:''}</button></div>
   ${inboxCard()}
   ${wxCard()}
   ${S.settings.push&&pushIssue?'<div class="note" style="margin:0 0 12px">Bildirim kaydın yenilenemedi, bildirimler gelmeyebilir. Ayarlar\'dan arka plan bildirimini kapatıp tekrar aç.</div>':''}
@@ -557,7 +566,7 @@ function render(){
 
 /* ---------- ilaç formu ---------- */
 function openSheet(){ $('#sheet').innerHTML=sheetMed(); $('#sheetwrap').classList.add('open'); }
-function closeSheet(){ $('#sheetwrap').classList.remove('open'); draft=null; rdraft=null; adraft=null; delArm=''; }
+function closeSheet(){ $('#sheetwrap').classList.remove('open'); draft=null; rdraft=null; adraft=null; delArm=''; if(histOpen){ histOpen=false; render(); } }
 function sheetMed(){
   const d=draft;
   return `<div class="grab"></div><h2>${d.id?'İlacı düzenle':'Yeni ilaç'}</h2>
@@ -1003,6 +1012,36 @@ function inboxCard(){
   ${n>4?`<div class="fine" style="margin:4px 0 4px">ve ${n-4} bildirim daha</div>`:''}</div>`;
 }
 
+/* ---------- bildirim geçmişi (zil) ---------- */
+let histItems=[],histNew=new Set(),histOpen=false;
+function histDay(ts){
+  const d=new Date(ts),n=new Date(),yd=new Date(); yd.setDate(n.getDate()-1);
+  if(d.toDateString()===n.toDateString()) return 'Bugün';
+  if(d.toDateString()===yd.toDateString()) return 'Dün';
+  return `${d.getDate()} ${AYLAR[d.getMonth()]} ${GUN_UZUN[d.getDay()]}`;
+}
+function renderHistory(){
+  let last='',rows='';
+  histItems.forEach((i,k)=>{
+    const day=histDay(i.ts); if(day!==last){ last=day; rows+=`<div class="hd">${day}</div>`; }
+    const d=new Date(i.ts);
+    rows+=`<button class="hi${histNew.has(i.ts)?' new':''}" data-a="histOpen" data-i="${k}"><span class="ht">${pad(d.getHours())}:${pad(d.getMinutes())}</span><div><b>${esc(i.title)}</b><span>${esc(i.body)}</span></div></button>`;
+  });
+  $('#sheet').innerHTML=`<div class="grab"></div><h2>Bildirimler</h2>
+  <p class="fine" style="margin-top:4px">Telefonuna gelen son bildirimler ve ne zaman geldikleri. En fazla 50 tanesi saklanır.${histNew.size?` Renkli olanlar yeni.`:''}</p>
+  ${rows||'<div class="empty"><p>Henüz bildirim yok. Bundan sonra gelen bildirimler burada listelenir.</p></div>'}
+  <div class="actions">${histItems.length?`<button class="btn danger" data-a="inboxWipe">${delArm==='inbox'?'Emin misin?':'Geçmişi temizle'}</button>`:''}<button class="btn teal" data-a="closeSheet">Kapat</button></div>`;
+}
+async function openHistory(){
+  const b=await inboxRead();
+  histItems=(b.items||[]).slice().sort((x,y)=>y.ts-x.ts);
+  histNew=new Set(histItems.filter(i=>!i.read).map(i=>i.ts));
+  delArm=''; histOpen=true; renderHistory(); $('#sheetwrap').classList.add('open');
+  if(histNew.size||b.badge){ (b.items||[]).forEach(i=>{ i.read=true; }); b.badge=0; await inboxWrite(b); }
+  try{ if('clearAppBadge' in navigator) await navigator.clearAppBadge(); }catch(e){}
+  inboxList=[];
+}
+
 /* ---------- olaylar ---------- */
 document.addEventListener('click',e=>{
   if(e.target.id==='sheetwrap'){closeSheet();return;}
@@ -1047,6 +1086,12 @@ document.addEventListener('click',e=>{
       else{ S.appts=(S.appts||[]).filter(x=>x.id!==adraft.id); persist(); closeSheet(); render(); toast('Randevu silindi'); }
       break;
     case 'theme': S.settings.theme=D.v; persist(); applyTheme(); render(); break;
+    case 'inboxHist': openHistory(); break;
+    case 'histOpen': { const i=histItems[+D.i]; if(i&&i.url&&i.url!=='/'){ const u=i.url; closeSheet(); handleNav(u); } break; }
+    case 'inboxWipe':
+      if(delArm!=='inbox'){ delArm='inbox'; renderHistory(); }
+      else{ (async()=>{ const b=await inboxRead(); b.items=[]; b.badge=0; await inboxWrite(b); histItems=[]; histNew=new Set(); inboxList=[]; delArm=''; renderHistory(); toast('Geçmiş temizlendi'); })(); }
+      break;
     case 'inboxClear': inboxMark(true); break;
     case 'inboxOpen': { const i=inboxList[+D.i]; if(i){ const u=i.url; inboxMark(false,i.ts).then(()=>handleNav(u)); } break; }
     case 'aClose': closeAlert(); break;

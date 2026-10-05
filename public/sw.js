@@ -34,7 +34,7 @@ self.addEventListener('push', e => {
       const all = await windows();
       const visible = all.some(c => c.visibilityState === 'visible');   // kişi uygulamaya bakıyorsa rozet gerekmez
       const b = await readBox();
-      b.items = [{ ts: Date.now(), title: d.title || 'Düzen', body: d.body || '', url: d.url || '/', tag, read: false }, ...(b.items || [])].slice(0, 30);
+      b.items = [{ ts: Date.now(), title: d.title || 'Düzen', body: d.body || '', url: d.url || '/', tag, read: false }, ...(b.items || [])].slice(0, 50);
       if (!visible) b.badge = (b.badge || 0) + 1;
       await writeBox(b);
       if (!visible && 'setAppBadge' in self.navigator) await self.navigator.setAppBadge(b.badge);
