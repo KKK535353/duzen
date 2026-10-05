@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { store } from "../lib/push.mjs";
+import { store, localNow } from "../lib/push.mjs";
 
 const same = (a, b) => {
   const x = Buffer.from(String(a)), y = Buffer.from(String(b));
@@ -20,6 +20,53 @@ export default async (req) => {
   const s = store();
   const now = Date.now();
   const today = fmtDate(now);
+
+  // Bildirim günlüğü: kime, ne zaman, ne gönderildi, gitti mi, dokundu mu
+  if (b.log === true) {
+    const OPEN_WINDOW = 30 * 60000;
+    const keysL = (await s.list({ prefix: "sub/" })).blobs;
+    const entries = [], missed = [];
+    for (const { key } of keysL) {
+      const rec = await s.get(key, { type: "json" });
+      if (!rec) continue;
+      const pid = key.slice(4);
+      const name = full(rec) || ("İsimsiz (" + pid.slice(0, 4) + ")");
+      const share = rec.shareMeds === true;                 // ilaç adı yalnızca kendisi paylaşmayı açtıysa görünür
+      const recent = (rec.act && rec.act.recent) || [];
+      for (const e of rec.log || []) {
+        if (now - e.ts > 3 * 864e5) continue;               // 3 günden eski kayıtlar gösterilmez
+        const openTs = recent.find((x) => x >= e.ts && x <= e.ts + OPEN_WINDOW);
+        entries.push({
+          ts: e.ts, name, kind: e.kind, sched: e.sched || "", med: share ? (e.med || "") : "",
+          res: e.res, code: e.code || 0, opened: !!openTs, openAfterMin: openTs ? Math.round((openTs - e.ts) / 60000) : null,
+        });
+      }
+      // Bugün zamanı geçtiği halde ilk ilaç bildirimi görünmeyenler
+      const L = localNow(rec.tz);
+      const doneSet = new Set(rec.done || []);
+      for (const m of rec.meds || []) {
+        if (L.date < m.start || (m.end && L.date > m.end) || !(m.days || []).includes(L.wd)) continue;
+        for (const t of m.times || []) {
+          const [h, mm] = t.split(":").map(Number);
+          if (L.min - (h * 60 + mm) < 6) continue;           // henüz erken ya da gönderim penceresinde
+          const slot = `${L.date}|${m.id}|${t}`;
+          if (doneSet.has(slot) || (rec.sent || {})[slot + "|1"]) continue;
+          missed.push({ name, sched: t, med: share ? m.name : "" });
+        }
+      }
+    }
+    entries.sort((a, c) => c.ts - a.ts);
+    const t0 = Date.parse(today + "T00:00:00+03:00");
+    const todayE = entries.filter((e) => e.ts >= t0);
+    return Response.json({
+      ok: true, entries: entries.slice(0, 80), missed,
+      summary: {
+        sentToday: todayE.filter((e) => e.res === "ok").length,
+        failedToday: todayE.filter((e) => e.res === "fail").length,
+        missedToday: missed.length,
+      },
+    });
+  }
   const last7 = new Set(Array.from({ length: 7 }, (_, i) => fmtDate(now - i * 864e5)));
 
   const { blobs } = await s.list({ prefix: "sub/" });

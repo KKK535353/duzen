@@ -50,6 +50,8 @@ button:disabled{opacity:.6}
 .bar{height:8px;border-radius:99px;background:#F9DCE6;margin:6px 0 4px;overflow:hidden}
 .bar i{display:block;height:100%;background:#2F9E5F}
 .row .del{margin:8px 0 0;width:auto;padding:6px 14px;font-size:13px;background:transparent;border:1.5px solid #E7B9B5;color:#B3261E}
+.row.warn{background:#FBE9DC}
+.row.bad{background:#F9DCE6}
 .h3{font-size:15px;font-weight:700;color:#5E5A74;margin:18px 0 8px}
 .chk{display:flex;gap:10px;align-items:center;margin-top:14px;padding:11px 12px;background:#fff;border-radius:12px;font-weight:650;font-size:15px}
 .chk input{width:20px;height:20px;margin:0;flex:none}
@@ -123,6 +125,8 @@ button:disabled{opacity:.6}
   <p class="hint">Kim uygulamayı açtı, kim bildirime dokundu. Yalnızca açılış zamanı ve sayıları tutulur, kişinin ilaç ya da sağlık verisi görünmez.</p>
   <button id="refAct" class="ghost" style="margin-top:6px">Yenile</button>
   <div id="actSum" class="sum" style="display:none"></div>
+  <button id="logBtn" class="ghost" style="margin-top:10px">Bildirim günlüğü (kime ne zaman gitti)</button>
+  <div id="logBox"></div>
   <div class="h3" id="bcHead" style="display:none">Son duyurular</div>
   <div id="bcList"></div>
   <div class="h3" id="ppHead" style="display:none">Kişiler</div>
@@ -130,7 +134,7 @@ button:disabled{opacity:.6}
 </section>
 
 <section id="p-med" style="display:none">
-  <p class="hint">Yalnızca ilaç listesini paylaşmayı Ayarlar'dan kendisi açan kişiler burada görünür. Paylaşmayanların ilaç bilgisi sunucudan bu panele hiç gelmez.</p>
+  <p class="hint">Yalnızca ilaç listesini paylaşmayı Ayarlar'dan kendisi açan kişiler burada görünür. Paylaşmayanların ilaç adı ve ayrıntıları sunucudan bu panele hiç gelmez.</p>
   <button id="refMed" class="ghost" style="margin-top:6px">Yenile</button>
   <div class="to" id="medView" style="display:none;margin-top:10px">
     <label><input type="radio" name="mv" value="person" checked>Kişiye göre</label>
@@ -445,6 +449,35 @@ $('wxNow').onclick=async()=>{
   if(!confirm(ids.length+' kişiye hava durumu şimdi gönderilecek (deneme). Bugünkü 10:00 bildirimi yine de ayrıca gider. Göndereyim mi?')) return;
   try{ const d=await api('/api/weather',{action:'sendnow',ids}); show('ok','Gönderildi: '+d.sent+' kişi, kaynak '+d.source+(d.failed?', '+d.failed+' hata':'')+'.'); }catch(e){show('err',e.message);}
 };
+
+/* ---- Bildirim günlüğü ---- */
+const KIND={ilac:'İlaç bildirimi',ilac2:'İlaç tekrarı',erteleme:'Ertelenen doz',hatirlatma:'Hatırlatıcı',atanan:'Atanmış hatırlatıcı',randevu:'Randevu',duyuru2:'Duyuru tekrarı',diger:'Bildirim'};
+const hm=ts=>new Date(ts).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Istanbul'});
+const dm=ts=>new Date(ts).toLocaleDateString('tr-TR',{day:'numeric',month:'short',timeZone:'Europe/Istanbul'});
+async function loadLog(){
+  const d=await api('/api/push-activity',{log:true});
+  const box=$('logBox'); box.textContent='';
+  const s=d.summary;
+  const sum=mk('div','hint'); sum.textContent='Bugün: '+s.sentToday+' bildirim gönderildi, '+s.failedToday+' hata, '+s.missedToday+' gönderilmemiş görünen. "Gönderildi", Apple bildirim servisinin mesajı kabul ettiği anlamına gelir, telefonda görüntülendiğini kanıtlamaz. "Dokundu", kişi bildirimden sonraki 30 dakika içinde uygulamayı açtı demektir.';
+  box.appendChild(sum);
+  box.appendChild(mk('div','h3','Gönderilmemiş görünenler (bugün)'));
+  if(!d.missed.length) box.appendChild(mk('p','sub','Yok.'));
+  d.missed.forEach(m=>{ const r=mk('div','row warn'); r.appendChild(mk('b',null,m.name+': '+m.sched+(m.med?' '+m.med:''))); r.appendChild(mk('small',null,'Saati geçti ama ilk bildirim kaydı yok. Saat geçtikten sonra eklenen bir ilaç ya da dozu işaretlenmemiş olabilir.')); box.appendChild(r); });
+  box.appendChild(mk('div','h3','Son gönderimler'));
+  if(!d.entries.length) box.appendChild(mk('p','sub','Henüz günlük yok. Bundan sonra gönderilenler burada görünür.'));
+  let lastDay='';
+  d.entries.forEach(e=>{
+    const day=dm(e.ts); if(day!==lastDay){ lastDay=day; box.appendChild(mk('div','hint',day)); }
+    const r=mk('div','row'+(e.res==='fail'?' bad':'')); 
+    r.appendChild(mk('b',null,hm(e.ts)+', '+e.name));
+    const what=(KIND[e.kind]||'Bildirim')+(e.sched?' ('+e.sched+')':'')+(e.med?', '+e.med:'');
+    const st=e.res==='ok'?'gönderildi':'HATA'+(e.code?' '+e.code:'');
+    const op=e.res!=='ok'?'':(e.opened?', dokundu ('+e.openAfterMin+' dk sonra)':', dokunmadı');
+    r.appendChild(mk('small',null,what+': '+st+op));
+    box.appendChild(r);
+  });
+}
+$('logBtn').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz'); await loadLog(); }catch(e){show('err',e.message);} };
 </script>
 </body>
 </html>

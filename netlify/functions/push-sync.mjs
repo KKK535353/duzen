@@ -81,6 +81,7 @@ export default async (req) => {
       const d = (act.days[day] = act.days[day] || { o: 0, n: 0 });
       d.o++;
       act.lastOpen = tsNow;
+      act.recent = [...(act.recent || []), tsNow].filter((x) => tsNow - x < 3 * 864e5).slice(-40);
       if (e.type === "notif") { d.n++; act.lastNotif = { ts: tsNow, kind: e.kind || "bildirim" }; }
     }
     const keys = Object.keys(act.days).sort();
@@ -101,6 +102,8 @@ export default async (req) => {
     shareMeds: b.shareMeds !== undefined ? b.shareMeds === true : !!(old && old.shareMeds),
     done,
     act,
+    created: (old && old.created) || Date.now(),
+    log: (old && old.log) || [],
     sent: (old && old.sent) || {},
     updated: Date.now(),
   };

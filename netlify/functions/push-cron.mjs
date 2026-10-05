@@ -27,23 +27,29 @@ export default async () => {
     const nowMs = Date.now();
     rec.sent = rec.sent || {};
     let changed = false, gone = false;
+    const entries = [];   // bu turdaki gönderim kayıtları (panel günlüğü için)
 
     for (const k of Object.keys(rec.sent)) {
       if (!k.startsWith(now.date)) { delete rec.sent[k]; changed = true; }
     }
     const done = new Set(rec.done || []);
 
-    // true: gönderildi, false: abonelik geçersiz (kayıt silindi)
-    const deliver = async (payload) => {
+    // true: devam, false: abonelik geçersiz (kayıt silindi).
+    // meta: günlük için tür/saat/ilaç adı; key: geçici hata olursa yeniden denenebilsin diye "gönderildi" işareti geri alınır
+    const deliver = async (payload, meta = {}) => {
+      const e0 = { ts: nowMs, kind: meta.kind || "diger", sched: meta.sched || "", med: meta.med || "" };
       try {
         await webpush.sendNotification(rec.sub, JSON.stringify(payload), { TTL: 600, urgency: "high" });
         sentCount++;
+        entries.push({ ...e0, res: "ok" });
       } catch (e) {
         if (e.statusCode === 404 || e.statusCode === 410) {
           await s.delete(key); await s.delete("assigned/" + pid);
           return false;
         }
         console.error("push error", e.statusCode, e.body);
+        entries.push({ ...e0, res: "fail", code: e.statusCode || 0 });
+        if (meta.key) { delete rec.sent[meta.key]; changed = true; }
       }
       return true;
     };
@@ -76,7 +82,7 @@ export default async () => {
           body: stage === 2 ? `${t} dozunu henüz işaretlemedin` : (m.dose ? `${t}, ${m.dose}` : `${t}, dozunu almayı unutma`),
           tag: slot,
           url: `/?slot=${enc(slot)}`,
-        });
+        }, { kind: stage === 2 ? "ilac2" : "ilac", sched: t, med: m.name, key: slot + "|" + stage });
         if (!ok) { gone = true; break; }
       }
     }
@@ -96,7 +102,7 @@ export default async () => {
         body: `${time} dozunu ertelemiştin`,
         tag: z.slot,
         url: `/?slot=${enc(z.slot)}`,
-      });
+      }, { kind: "erteleme", sched: time, med: m.name, key: k });
       if (!ok) gone = true;
     }
 
@@ -111,7 +117,7 @@ export default async () => {
       if (rec.sent[k]) continue;
       rec.sent[k] = nowMs;
       changed = true;
-      const ok = await deliver({ title: "Düzen", body: r.text, tag: `${now.date}|r:${r.id}`, url: infoUrl("Düzen", r.text) });
+      const ok = await deliver({ title: "Düzen", body: r.text, tag: `${now.date}|r:${r.id}`, url: infoUrl("Düzen", r.text) }, { kind: "hatirlatma", sched: r.time, key: k });
       if (!ok) gone = true;
     }
 
@@ -127,7 +133,7 @@ export default async () => {
       if (rec.sent[k]) continue;
       rec.sent[k] = nowMs;
       changed = true;
-      const ok = await deliver({ title: "Düzen", body: r.text, tag: `${now.date}|a:${r.id}`, url: infoUrl("Düzen", r.text) });
+      const ok = await deliver({ title: "Düzen", body: r.text, tag: `${now.date}|a:${r.id}`, url: infoUrl("Düzen", r.text) }, { kind: "atanan", sched: r.time, key: k });
       if (!ok) gone = true;
     }
 
@@ -140,7 +146,7 @@ export default async () => {
       handled.add(`${it.pid}|${it.sentAt}`);
       if (age > 600000) continue;
       if ((rec.updated || 0) > it.sentAt) continue; // uygulamayı açmış
-      const ok = await deliver({ title: "Tekrar: " + it.title, body: it.body, tag: "rep-" + it.sentAt, url: it.url });
+      const ok = await deliver({ title: "Tekrar: " + it.title, body: it.body, tag: "rep-" + it.sentAt, url: it.url }, { kind: "duyuru2" });
       if (!ok) gone = true;
     }
 
@@ -170,14 +176,18 @@ export default async () => {
       if (!msg || rec.sent[k]) continue;
       rec.sent[k] = nowMs;
       changed = true;
-      const ok = await deliver({ title: "Doktor randevusu", body: msg, tag: k, url: infoUrl("Doktor randevusu", msg) });
+      const ok = await deliver({ title: "Doktor randevusu", body: msg, tag: k, url: infoUrl("Doktor randevusu", msg) }, { kind: "randevu", sched: a.time, key: k });
       if (!ok) gone = true;
     }
 
     // Yalnızca "sent" alanını güncel kayda yaz (eşzamanlı eşitlemeyi ezmemek için)
-    if (changed && !gone) {
+    if ((changed || entries.length) && !gone) {
       const fresh = await s.get(key, { type: "json" });
-      if (fresh) { fresh.sent = rec.sent; await s.setJSON(key, fresh); }
+      if (fresh) {
+        fresh.sent = rec.sent;
+        if (entries.length) fresh.log = [...(fresh.log || []), ...entries].filter((x) => nowMs - x.ts < 3 * 864e5).slice(-60);
+        await s.setJSON(key, fresh);
+      }
     }
   }
 
