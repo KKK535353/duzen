@@ -158,6 +158,19 @@ input[type=file]{display:none}
 .appt{display:block;width:100%;text-align:left;background:var(--surf);border:0;border-radius:18px;padding:12px 16px;margin-bottom:8px;box-shadow:0 1px 0 var(--line)}
 .appt b{display:block}
 .appt span{color:var(--ink2);font-size:14px}
+.wxcard{background:var(--surf);border-radius:16px;padding:10px 12px 8px;margin:0 0 14px;box-shadow:0 1px 0 var(--line)}
+.wxtop{display:flex;gap:10px;align-items:center}
+.wxbig{font-size:30px;line-height:1}
+.wxtop b{display:block;font-size:15px}
+.wxtop span{font-size:13px;color:var(--ink2)}
+.wxrow{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:8px}
+.wxd{padding:4px 0;text-align:center;border-radius:10px;display:flex;flex-direction:column;align-items:center}
+.wxd b{font-size:12px;color:var(--ink2)}
+.wxd .wxi{font-size:20px;line-height:1.3}
+.wxd .wxh{font-size:13px;font-weight:800}
+.wxd.today{background:var(--teal-soft)}
+.wxd.past{opacity:.5}
+.wxfoot{font-size:11.5px;color:var(--ink2);margin-top:5px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -387,9 +400,8 @@ function renderHome(){
   }
   const courses=S.meds.map(m=>({m,ci:courseInfo(m)})).filter(x=>x.ci&&(x.ci.state==='run'||(x.ci.state!=='soon'&&diff(t,x.m.end)>=0&&diff(t,x.m.end)<=2)));
   const courseHome=courses.length?`<h3>Tedavi ilerlemesi</h3>${courses.map(({m,ci})=>`<div class="course" style="margin-top:6px">${ringSvg(ci)}<div class="clg"><b>${esc(m.name)}</b>${courseLegend(ci,m)}</div></div>`).join('')}`:'';
-  const nextAppt=upcomingAppts().find(a=>diff(a.date,t)<=7);
-  const apptHome=nextAppt?`<h3>Yaklaşan randevu</h3><button class="appt" data-a="tab" data-t="meds"><b>${esc(nextAppt.title)}</b><span>${relDay(nextAppt.date)}, ${nextAppt.time}${nextAppt.place?', '+esc(nextAppt.place):''}</span></button>`:'';
   return `<div class="head"><div><h1>${greeting()}</h1><div class="sub">${long(t)}</div></div></div>
+  ${wxCard()}
   <div class="ring-row">
     <svg class="ring" viewBox="0 0 84 84" aria-hidden="true"><circle class="bg" cx="42" cy="42" r="34"/><circle class="fg" cx="42" cy="42" r="34" transform="rotate(-90 42 42)" stroke-dasharray="${C}" stroke-dashoffset="${off}"/><text x="42" y="49">${taken}/${total}</text></svg>
     <div>${summary}</div>
@@ -397,8 +409,8 @@ function renderHome(){
   ${low}
   ${total?`<h3>Bugünün dozları</h3><ul class="doses">${rows}</ul>`:`<div class="empty"><p>Henüz ilaç eklemedin.</p><button class="btn teal" data-a="newMed">İlaç ekle</button></div>`}
   ${courseHome}
-  ${apptHome}
-  <h3>Döngü</h3>${cyc}`;
+  <h3>Döngü</h3>${cyc}
+  ${apptSection()}`;
 }
 
 function renderMeds(){
@@ -418,8 +430,7 @@ function renderMeds(){
   <h3>Liste</h3>
   ${list||`<div class="empty"><p>İlaç eklediğinde saatleri burada görünür.</p><button class="btn teal" data-a="newMed">İlk ilacı ekle</button></div>`}
   ${S.meds.length?`<button class="btn ghost block" style="margin-top:8px" data-a="ics">Telefon takvimine aktar (.ics)</button>
-  <p class="fine">Uygulama kapalıyken de alarm çalsın istiyorsan bu dosyayı takvimine ekle. Her ilaç, seçtiğin saatlerde tekrarlayan bir alarm olur.</p>`:''}
-  ${apptSection()}`;
+  <p class="fine">Uygulama kapalıyken de alarm çalsın istiyorsan bu dosyayı takvimine ekle. Her ilaç, seçtiğin saatlerde tekrarlayan bir alarm olur.</p>`:''}`;
 }
 
 function renderCycle(){
@@ -576,6 +587,7 @@ function showAlert(s,quiet){
 }
 function closeAlert(){ $('#alert').classList.remove('open'); alertOpen=null; render(); if(pendingInfo){ const p=pendingInfo; pendingInfo=null; showInfo(p.title,p.body); } }
 function tick(){
+  if(wxNeed()) pushSync();
   const t=today(),nm=nowMin();
   if(!alertOpen){
     const due=slotsFor(t).find(s=>!getLog(t,s.key)&&tmin(s.t)<=nm&&nm-tmin(s.t)<=90&&!fired[t+s.key]&&!(snooze[s.key]>Date.now()));
@@ -616,19 +628,22 @@ async function doSync(){
   if(!S.settings.push||!PUSH_OK()) return false;
   try{
     const reg=await navigator.serviceWorker.ready, sub=await reg.pushManager.getSubscription(); if(!sub) return false;
-    const evs=evq.slice(), t=today(),y=addDays(t,-1),done=[];
+    const evs=evq.slice(), wantWx=wxNeed(), t=today(),y=addDays(t,-1),done=[];
+    if(wantWx) wxAsked=Date.now();
     [t,y].forEach(d=>Object.keys(S.log[d]||{}).forEach(k=>done.push(d+'|'+k)));
     const r=await fetch('/api/push-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       subscription:sub.toJSON(),name:S.settings.name||'',surname:S.settings.surname||'',shareMeds:S.settings.shareMeds===true,tz:Intl.DateTimeFormat().resolvedOptions().timeZone,
       meds:S.meds.map(m=>({id:m.id,name:m.name,dose:m.dose,times:m.times,days:m.days,start:m.start,end:m.end})),
-      appts:(S.appts||[]).filter(a=>a.date>=addDays(today(),-1)).map(a=>({id:a.id,title:a.title,place:a.place||'',date:a.date,time:a.time,d1:!!a.d1,h2:!!a.h2})),
+      appts:(S.appts||[]).filter(a=>a.date>=addDays(today(),-1)).map(a=>({id:a.id,title:a.title,place:a.place||'',date:a.date,time:a.time,w1:a.w1!==false,d3:a.d3!==false,d1:!!a.d1,h2:!!a.h2})),
       evs,
+      wx:wantWx,
       snz:(S.snz||[]).filter(z=>z.until>Date.now()-3600e3),
       rem:(S.reminders||[]).filter(r=>r.on).map(r=>({id:r.id,text:r.text,time:r.time,days:r.days})),done})});
     if(r.status===403){ const d=await r.json().catch(()=>({})); if(d&&d.removed){ await handleRemoved(); return 'removed'; } }
-    if(r.ok) evq.splice(0,evs.length);
+    if(r.ok){ evq.splice(0,evs.length); if(wantWx){ const d=await r.json().catch(()=>({})); wxApply(d); } }
+    else if(wantWx) wxAsked=0;
     return r.ok;
-  }catch(e){console.error(e);return false;}
+  }catch(e){console.error(e);wxAsked=0;return false;}
 }
 async function handleRemoved(){
   S.settings.push=false; S.settings.shareMeds=false; evq.length=0; persist();
@@ -829,10 +844,14 @@ function courseBlock(m){
 /* ---------- doktor randevuları ---------- */
 const upcomingAppts=()=>{const t=today(); return (S.appts||[]).filter(a=>a.date>=t).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));};
 const relDay=d=>{const n=diff(d,today()); return n===0?'Bugün':n===1?'Yarın':`${n} gün sonra`;};
+function apptRemTxt(a){
+  const r=[]; if(a.w1!==false) r.push('1 hafta'); if(a.d3!==false) r.push('3 gün'); if(a.d1) r.push('1 gün'); if(a.h2) r.push('2 saat');
+  return r.length?'Hatırlatma: '+r.join(', ')+' önce':'Hatırlatma yok';
+}
 function apptSection(){
   const list=upcomingAppts();
-  return `<h3>Doktor randevuları</h3>
-  ${list.map(a=>`<button class="appt" data-a="editAppt" data-id="${a.id}"><b>${esc(a.title)}</b><span>${relDay(a.date)}, ${short(a.date)} ${a.time}${a.place?', '+esc(a.place):''}</span></button>`).join('')||'<div class="empty"><p>Yaklaşan randevu yok.</p></div>'}
+  return `<h3>Doktor randevu takip</h3>
+  ${list.map(a=>`<button class="appt" data-a="editAppt" data-id="${a.id}"><b>${esc(a.title)}</b><span>${relDay(a.date)}, ${short(a.date)} ${a.time}${a.place?', '+esc(a.place):''}</span><span style="display:block;font-size:13px">${apptRemTxt(a)}</span></button>`).join('')||'<div class="empty"><p>Yaklaşan randevu yok. Doktordan aldığın randevuyu yaz, tarihi yaklaşırken haber vereyim.</p></div>'}
   <button class="btn ghost sm" style="margin-top:6px" data-a="newAppt">Randevu ekle</button>
   ${S.settings.push?'':'<p class="fine">Hatırlatma bildirimi için Ayarlar\'dan arka plan bildirimlerini aç.</p>'}`;
 }
@@ -844,7 +863,7 @@ function sheetAppt(){
   <div class="two"><label>Tarih<input type="date" id="a-date" min="${today()}" value="${d.date}"></label><label>Saat<input type="time" id="a-time" value="${d.time}"></label></div>
   <label>Yer (isteğe bağlı)<input id="a-place" maxlength="80" value="${esc(d.place)}" placeholder="Örn. Şehir Hastanesi" autocomplete="off"></label>
   <div class="lbl">Hatırlat</div>
-  <div class="chips" style="margin-top:0"><button class="chip v ${d.d1?'on':''}" data-a="aptTog" data-k="d1">Bir gün önce, 18:00</button><button class="chip v ${d.h2?'on':''}" data-a="aptTog" data-k="h2">2 saat önce</button></div>
+  <div class="chips" style="margin-top:0"><button class="chip v ${d.w1?'on':''}" data-a="aptTog" data-k="w1">1 hafta önce, 10:00</button><button class="chip v ${d.d3?'on':''}" data-a="aptTog" data-k="d3">3 gün önce, 10:00</button><button class="chip v ${d.d1?'on':''}" data-a="aptTog" data-k="d1">1 gün önce, 18:00</button><button class="chip v ${d.h2?'on':''}" data-a="aptTog" data-k="h2">2 saat önce</button></div>
   ${S.settings.push?'':'<p class="fine">Hatırlatma bildirimi için arka plan bildirimlerini aç.</p>'}
   <div class="actions">${d.id?`<button class="btn danger" data-a="delAppt">${delArm==='appt'?'Emin misin?':'Sil'}</button>`:`<button class="btn ghost" data-a="closeSheet">Vazgeç</button>`}<button class="btn teal" data-a="saveAppt">Kaydet</button></div>`;
 }
@@ -856,9 +875,34 @@ function saveAppt(){
   if(d.date<today()) return toast('Geçmiş bir tarih seçemezsin');
   if(!d.time) return toast('Saati seç');
   S.appts=S.appts||[];
-  const obj={id:d.id||'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),title:title.slice(0,80),date:d.date,time:d.time,place:d.place.trim().slice(0,80),d1:!!d.d1,h2:!!d.h2};
+  const obj={id:d.id||'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),title:title.slice(0,80),date:d.date,time:d.time,place:d.place.trim().slice(0,80),w1:!!d.w1,d3:!!d.d3,d1:!!d.d1,h2:!!d.h2};
   const i=S.appts.findIndex(x=>x.id===obj.id); if(i>=0) S.appts[i]=obj; else S.appts.push(obj);
   persist(); closeSheet(); render(); toast('Randevu kaydedildi');
+}
+
+/* ---------- hava durumu (yetki verilen kişiler): eşitleme yanıtıyla gelir ---------- */
+let wxData=null,wxAt=0,wxErr=false,wxAsked=0;
+const wxNeed=()=>S.settings.push&&Date.now()-wxAsked>20*60000;
+function wxLoadCache(){
+  try{ const c=JSON.parse(localStorage.getItem('duzen:wx')||'null'); if(c&&c.data&&c.data.today===today()){ wxData=c.data; wxAt=c.at||0; } }catch(e){}
+}
+function wxApply(d){
+  if(d&&d.weather&&d.weather.week){ wxData=d.weather; wxAt=Date.now(); wxErr=false; try{localStorage.setItem('duzen:wx',JSON.stringify({data:wxData,at:wxAt}));}catch(e){} }
+  else if(d&&d.weather&&d.weather.error){ wxErr=true; }
+  else if(d&&d.weatherSelected===false){ wxData=null; wxErr=false; try{localStorage.removeItem('duzen:wx');}catch(e){} }
+  else return;
+  const a=document.activeElement;
+  if(tab==='home'&&!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'))&&!$('#sheetwrap').classList.contains('open')) render();
+}
+function wxCard(){
+  if(!wxData||!wxData.week) return wxErr?'<div class="wxcard"><span class="sub">Hava durumu şu an alınamıyor</span></div>':'';
+  const w=wxData.week,n=wxData.now;
+  const srcs=[...new Set([...w.filter(d=>!d.na).map(d=>d.src),n&&n.src].filter(Boolean))];
+  const src=!srcs.length?'':srcs.length===1?(srcs[0]==='MGM'?'MGM':'Open-Meteo'):'MGM, Open-Meteo';
+  const top=n?`<div class="wxtop"><span class="wxbig">${n.icon||''}</span><div><b>Bugün ${esc(n.cond)}, ${n.low}° / ${n.high}°</b><span>${n.wet?'Şemsiye al. ':''}${n.wind!=null?`Rüzgar ${n.wind} km/sa${n.windy?' 💨':''}`:''}${n.humMin!=null?`, nem %${n.humMin}-${n.humMax}`:''}</span></div></div>`
+    :'<div class="wxtop"><div><b>Bugünün tahmini alınamadı</b></div></div>';
+  const cells=w.map(d=>`<div class="wxd${d.today?' today':''}${d.past?' past':''}"><b>${d.label}</b><span class="wxi">${d.na?'–':d.icon}</span><span class="wxh">${d.na?'':d.high+'°'}</span></div>`).join('');
+  return `<div class="wxcard">${top}<div class="wxrow">${cells}</div><div class="wxfoot">İstanbul${wxData.monday>wxData.today?', gelecek hafta':''}${src?', kaynak '+src:''}</div></div>`;
 }
 
 /* ---------- olaylar ---------- */
@@ -896,8 +940,8 @@ document.addEventListener('click',e=>{
       weatherCache.off=!weatherCache.off; render();
       assignedCall({weatherOff:weatherCache.off}).then(d=>{ if(d){ if(d.weather) weatherCache=d.weather; if(tab==='set') render(); } else toast('Kaydedilemedi, tekrar dene'); });
       break; }
-    case 'newAppt': adraft={id:null,title:'',date:t,time:'09:00',place:'',d1:true,h2:true}; delArm=''; openAppt(); break;
-    case 'editAppt': { const a=(S.appts||[]).find(x=>x.id===D.id); if(!a) break; adraft={...a}; delArm=''; openAppt(); break; }
+    case 'newAppt': adraft={id:null,title:'',date:t,time:'09:00',place:'',w1:true,d3:true,d1:true,h2:false}; delArm=''; openAppt(); break;
+    case 'editAppt': { const a=(S.appts||[]).find(x=>x.id===D.id); if(!a) break; adraft={...a,w1:a.w1!==false,d3:a.d3!==false}; delArm=''; openAppt(); break; }
     case 'aptTog': syncAppt(); adraft[D.k]=!adraft[D.k]; openAppt(); break;
     case 'saveAppt': saveAppt(); break;
     case 'delAppt':
@@ -961,7 +1005,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ hiddenAt
   const d=await store.load();
   if(d) S={...S,...d,settings:{...S.settings,...(d.settings||{})}};
   if((S.appts||[]).some(a=>a.date<addDays(today(),-1))){ S.appts=S.appts.filter(a=>a.date>=addDays(today(),-1)); persist(); }
-  render(); tick(); setInterval(tick,15000); setTimeout(maybeAskName,700);
+  wxLoadCache(); render(); tick(); setInterval(tick,15000); setTimeout(maybeAskName,700);
   if('serviceWorker' in navigator&&location.protocol==='https:'){ navigator.serviceWorker.register('/sw.js').catch(()=>{}); if(S.settings.push) pushSync();
     navigator.serviceWorker.addEventListener('message',e=>{ if(e.data&&e.data.type==='nav') handleNav(e.data.url); });
   }

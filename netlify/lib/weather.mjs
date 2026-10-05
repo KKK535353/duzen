@@ -163,6 +163,21 @@ export async function getWeek() {
   return { today, monday, week, now: t ? view(t) : null, note: errs.join("; ") };
 }
 
+// Haftalık tahmin: bir saat önbellekte tutulur (herkes her açışında MGM'yi yormasın)
+export async function getWeekCached(s) {
+  const today = localNow("Europe/Istanbul").date;
+  const cache = await s.get("wxweek", { type: "json" });
+  if (cache && cache.data && cache.data.today === today && Date.now() - cache.ts < 3600000) return { ...cache.data, cached: true };
+  try {
+    const data = await getWeek();
+    await s.setJSON("wxweek", { ts: Date.now(), data });
+    return data;
+  } catch (e) {
+    if (cache && cache.data) return { ...cache.data, stale: true };
+    throw e;
+  }
+}
+
 export function buildMessage(f) {
   let day = "";
   try { day = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "numeric", month: "long", weekday: "long" }).format(new Date()); } catch { /* tarih yazılmaz */ }

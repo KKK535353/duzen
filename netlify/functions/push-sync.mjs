@@ -1,4 +1,5 @@
 import { store, idOf, ALLOWED, localNow } from "../lib/push.mjs";
+import { getWeekCached } from "../lib/weather.mjs";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -57,6 +58,8 @@ export default async (req) => {
     time: TIME.test(a && a.time) ? a.time : "",
     d1: !!(a && a.d1),
     h2: !!(a && a.h2),
+    w1: !(a && a.w1 === false),
+    d3: !(a && a.d3 === false),
   })).filter((a) => a.id && a.title && a.date && a.time);
 
   const snz = (Array.isArray(b.snz) ? b.snz : []).slice(0, 30)
@@ -108,7 +111,18 @@ export default async (req) => {
     const bc = await s.get("bc/" + e.ref, { type: "json" });
     if (bc && bc.opened && !bc.opened[id]) { bc.opened[id] = Date.now(); await s.setJSON("bc/" + e.ref, bc); }
   }
-  return Response.json({ ok: true, meds: meds.length });
+  const out = { ok: true, meds: meds.length };
+  // Uygulama hava durumu isterse ve kişi panelden yetkilendirilmişse haftalık tahmini yanıta ekle
+  if (b.wx === true) {
+    try {
+      const cfg = await s.get("weather", { type: "json" });
+      if (cfg && cfg.recipients && cfg.recipients[id]) {
+        try { out.weather = await getWeekCached(s); }
+        catch (e) { out.weather = { error: true }; console.error("push-sync: hava durumu alınamadı", e && e.message); }
+      } else out.weatherSelected = false;
+    } catch { /* hava durumu hata verse de eşitleme başarılı sayılır */ }
+  }
+  return Response.json(out);
 };
 
 export const config = { path: "/api/push-sync" };

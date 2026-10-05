@@ -2,6 +2,10 @@ import { store, vapid, webpush, localNow } from "../lib/push.mjs";
 
 const enc = encodeURIComponent;
 const infoUrl = (t, b) => `/?t=${enc(t)}&b=${enc(b)}`;
+const trDate = (s) => {
+  try { return new Intl.DateTimeFormat("tr-TR", { timeZone: "UTC", day: "numeric", month: "long", weekday: "long" }).format(new Date(s + "T00:00:00Z")); }
+  catch { return s; }
+};
 const dayDiff = (a, b) => Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 864e5);
 
 export default async () => {
@@ -147,9 +151,17 @@ export default async () => {
       const dd = dayDiff(a.date, now.date);
       const until = dd * 1440 + ah * 60 + am - now.min; // randevuya kalan dakika
       const place = a.place ? `, ${a.place}` : "";
+      const dstr = trDate(a.date);
+      const when = `${dstr}, saat ${a.time}`;
       let msg = null, k = null;
-      if (a.d1 && dd === 1 && now.min >= 1080 && now.min <= 1082) {
-        msg = `Yarın saat ${a.time} doktor randevun var: ${a.title}${place}`;
+      if (a.w1 !== false && dd === 7 && now.min >= 600 && now.min <= 602) {
+        msg = `Doktor randevuna 1 hafta kaldı: ${when}. ${a.title}${place}`;
+        k = `${now.date}|p:${a.id}|w1`;
+      } else if (a.d3 !== false && dd === 3 && now.min >= 600 && now.min <= 602) {
+        msg = `Doktor randevuna 3 gün kaldı: ${when}. ${a.title}${place}`;
+        k = `${now.date}|p:${a.id}|d3`;
+      } else if (a.d1 && dd === 1 && now.min >= 1080 && now.min <= 1082) {
+        msg = `Doktor randevun yarın: ${when}. ${a.title}${place}`;
         k = `${now.date}|p:${a.id}|d1`;
       } else if (a.h2 && until >= 118 && until <= 120) {
         msg = `2 saat sonra doktor randevun var (${a.time}): ${a.title}${place}`;
