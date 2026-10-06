@@ -68,7 +68,8 @@ export default async (req) => {
       });
       await s.setJSON("assigned/" + pid, list);
       count++;
-      // Kişi bilgilensin: bildirimle haber ver
+      // Kişiye "ayarlandı" bildirimi yalnızca panelde istenirse gider (varsayılan: gitmez)
+      if (b.notify !== true) continue;
       try {
         await webpush.sendNotification(sub.sub, JSON.stringify({
           title: "Düzen",

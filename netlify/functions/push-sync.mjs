@@ -118,11 +118,26 @@ export default async (req) => {
     if (bc && bc.opened && !bc.opened[id]) { bc.opened[id] = Date.now(); await s.setJSON("bc/" + e.ref, bc); }
   }
   const out = { ok: true, meds: meds.length };
+  // Sessiz duyurular: bildirim gitmedi, uygulama açılınca buradan teslim edilir
+  if (b.inbox === true) {
+    try {
+      const q = await s.get("qmsg/" + id, { type: "json" });
+      if (q && q.length) {
+        out.inbox = q.filter((m) => Date.now() - m.ts < 14 * 864e5).map(({ id: mid, ts, title, body, url }) => ({ id: mid, ts, title, body, url }));
+        await s.delete("qmsg/" + id);
+        for (const m of q) {
+          if (!m.bid) continue;
+          const bc = await s.get("bc/" + m.bid, { type: "json" });
+          if (bc && bc.opened && !bc.opened[id]) { bc.opened[id] = Date.now(); await s.setJSON("bc/" + m.bid, bc); }
+        }
+      }
+    } catch { /* teslim edilemezse bir sonraki eşitlemede yeniden denenir */ }
+  }
   // Uygulama hava durumu isterse ve kişi panelden yetkilendirilmişse haftalık tahmini yanıta ekle
   if (b.wx === true) {
     try {
       const cfg = await s.get("weather", { type: "json" });
-      if (cfg && cfg.recipients && cfg.recipients[id]) {
+      if (cfg && cfg.recipients && cfg.recipients[id] && cfg.recipients[id].card !== false) {
         try { out.weather = await getWeekCached(s); }
         catch (e) { out.weather = { error: true }; console.error("push-sync: hava durumu alınamadı", e && e.message); }
       } else out.weatherSelected = false;

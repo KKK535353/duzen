@@ -163,21 +163,32 @@ input[type=file]{display:none}
 .clg .ok{color:var(--ok);font-weight:700}
 .clg .bad{color:var(--bad);font-weight:700}
 .mring text{font-size:12px;font-weight:800;fill:var(--ink);text-anchor:middle}
-.appt{display:block;width:100%;text-align:left;background:var(--surf);border:0;border-radius:18px;padding:12px 16px;margin-bottom:8px;box-shadow:0 1px 0 var(--line)}
-.appt b{display:block}
-.appt span{color:var(--ink2);font-size:14px}
+.appt{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center;width:100%;text-align:left;background:var(--surf);border:0;border-radius:18px;padding:10px 14px 10px 10px;margin-bottom:8px;box-shadow:0 1px 0 var(--line);color:inherit}
+.appt.past{opacity:.6}
+.adays{text-align:center;background:var(--violet-soft);border-radius:12px;padding:7px 2px}
+.adays b{display:block;font-size:22px;line-height:1.1;color:var(--ink)}
+.adays span{font-size:11px;color:var(--ink2)}
+.ainfo b{display:block}
+.ainfo span{display:block;color:var(--ink2);font-size:14px}
+.ainfo .arem{font-size:12.5px}
+.apptbig{display:flex;gap:14px;align-items:center;background:var(--violet-soft);border-radius:18px;padding:14px 16px;margin-bottom:6px}
+.apptbig .abn{font-size:40px;font-weight:800;line-height:1;min-width:72px;text-align:center}
+.apptbig b{display:block}
+.apptbig span{display:block;font-size:14px;color:var(--ink2)}
 .wxcard{background:var(--surf);border-radius:16px;padding:10px 12px 8px;margin:0 0 14px;box-shadow:0 1px 0 var(--line)}
 .wxtop{display:flex;gap:10px;align-items:center}
 .wxbig{font-size:30px;line-height:1}
 .wxtop b{display:block;font-size:15px}
 .wxtop span{font-size:13px;color:var(--ink2)}
 .wxrow{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:8px}
-.wxd{padding:4px 0;text-align:center;border-radius:10px;display:flex;flex-direction:column;align-items:center}
+.wxd{padding:4px 0;text-align:center;border-radius:10px;display:flex;flex-direction:column;align-items:center;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer}
 .wxd b{font-size:12px;color:var(--ink2)}
+.wxd small{font-size:10.5px;color:var(--ink2);line-height:1.1}
 .wxd .wxi{font-size:20px;line-height:1.3}
 .wxd .wxh{font-size:13px;font-weight:800}
 .wxd.today{background:var(--teal-soft)}
-.wxd.past{opacity:.5}
+.wxd.sel{outline:2px solid var(--violet)}
+.wxdet{margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--violet-soft);font-size:13.5px}
 .wxfoot{font-size:11.5px;color:var(--ink2);margin-top:5px}
 .inbox{background:var(--violet-soft);border-radius:16px;padding:10px 12px 6px;margin:0 0 14px}
 .ibh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
@@ -249,9 +260,10 @@ const ICON={
  home:'<svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
  meds:'<svg viewBox="0 0 24 24"><rect x="2.5" y="8.5" width="19" height="7" rx="3.5" transform="rotate(-45 12 12)"/><path d="M9.2 9.2l5.6 5.6"/></svg>',
  cycle:'<svg viewBox="0 0 24 24"><path d="M12 3c3.5 4.5 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 2.5-6.5 6-11z"/></svg>',
+ appt:'<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>',
  set:'<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>'
 };
-const TABS=[['home','Bugün','var(--teal-t)'],['meds','İlaçlar','var(--teal-t)'],['cycle','Döngü','var(--berry-t)'],['set','Ayarlar','var(--ink)']];
+const TABS=[['home','Ana sayfa','var(--teal-t)'],['meds','İlaçlar','var(--teal-t)'],['appt','Randevu','var(--violet-t)'],['cycle','Döngü','var(--berry-t)'],['set','Ayarlar','var(--ink)']];
 
 /* ---------- veri ---------- */
 const KEY='duzen:v1';
@@ -521,8 +533,9 @@ function renderSet(){
   const rems=S.reminders||[];
   const contactSection=`<h3>Bize ulaşın</h3>
   <div class="set row2"><div><b>Soru ya da isteğini yaz${contactUnread?`<span class="badge">${contactUnread}</span>`:''}</b><small>${contactUnread?'Yeni yanıt var':s.push?'Yanıt gelince bildirim alırsın':'Önce arka plan bildirimlerini aç'}</small></div><button class="btn teal sm" data-a="openContact">${contactUnread?'Yanıtı oku':'Yaz'}</button></div>`;
-  const wxSection=weatherCache.selected?`<h3>Hava durumu bildirimi</h3>
-  <div class="set row2"><div><b>İstanbul hava durumu</b><small>Her sabah 10:00'da, duyuru gönderen kişi senin için ayarladı. Kaynak: Meteoroloji Genel Müdürlüğü. İstersen kapatabilirsin.</small></div><button class="sw t ${weatherCache.off?'':'on'}" data-a="togWeather" role="switch" aria-checked="${!weatherCache.off}" aria-label="Hava durumu bildirimi"></button></div>`:'';
+  const wxAm=weatherCache.selected&&weatherCache.am!==false, wxPm=weatherCache.selected&&weatherCache.pm===true;
+  const wxSection=(wxAm||wxPm)?`<h3>Hava durumu bildirimi</h3>
+  <div class="set row2"><div><b>İstanbul hava durumu</b><small>Duyuru gönderen kişi senin için ${[wxAm?'her sabah 10:00\'da bugünün':'',wxPm?'her gece 23:00\'da yarının':''].filter(Boolean).join(' ve ')} tahminini ayarladı. Kaynak: Meteoroloji Genel Müdürlüğü. İstersen kapatabilirsin.</small></div><button class="sw t ${weatherCache.off?'':'on'}" data-a="togWeather" role="switch" aria-checked="${!weatherCache.off}" aria-label="Hava durumu bildirimi"></button></div>`:'';
   const asgSection=assignedCache.length?`<h3>Senin için ayarlanmış</h3>
   <p class="fine" style="margin-top:0">Bu hatırlatıcıları senin için ayarlayan kişi ekledi. İstersen kapatabilirsin.</p>
   ${assignedCache.map(r=>`<div class="set row2"><div><b>${esc(r.text)}</b><small>${r.time}, ${dayTxt(r)}</small></div><button class="sw t ${r.off?'':'on'}" data-a="togAsg" data-id="${r.id}" role="switch" aria-checked="${!r.off}" aria-label="Aç ya da kapat"></button></div>`).join('')}`:'';
@@ -559,7 +572,7 @@ function renderSet(){
 /* ---------- çizim ---------- */
 function render(){
   const main=$('#main'),sc=main.scrollTop;
-  main.innerHTML=({home:renderHome,meds:renderMeds,cycle:renderCycle,set:renderSet})[tab]();
+  main.innerHTML=({home:renderHome,meds:renderMeds,cycle:renderCycle,appt:renderAppt,set:renderSet})[tab]();
   main.scrollTop=sc;
   $('#nav').innerHTML=TABS.map(([id,l,c])=>`<button class="${tab===id?'on':''}" style="--c:${c}" data-a="tab" data-t="${id}" aria-label="${l}">${ICON[id==='set'?'set':id]}${l}</button>`).join('');
 }
@@ -682,6 +695,7 @@ async function doSync(){
       appts:(S.appts||[]).filter(a=>a.date>=addDays(today(),-1)).map(a=>({id:a.id,title:a.title,place:a.place||'',date:a.date,time:a.time,w1:a.w1!==false,d3:a.d3!==false,d1:!!a.d1,h2:!!a.h2})),
       evs,
       wx:wantWx,
+      inbox:true,
       snz:(S.snz||[]).filter(z=>z.until>Date.now()-3600e3),
       rem:(S.reminders||[]).filter(r=>r.on).map(r=>({id:r.id,text:r.text,time:r.time,days:r.days})),done})});
     if(r.status===403){ const d=await r.json().catch(()=>({})); if(d&&d.removed){ await handleRemoved(); return 'removed'; } }
@@ -689,6 +703,7 @@ async function doSync(){
       const d=await r.json().catch(()=>({}));
       if(d&&d.resubscribe){ wxAsked=0; return await renewSub(); }
       evq.splice(0,evs.length); if(pushIssue){ pushIssue=false; }
+      if(d&&Array.isArray(d.inbox)&&d.inbox.length) inboxAdd(d.inbox);
       if(wantWx) wxApply(d);
     }
     else if(wantWx) wxAsked=0;
@@ -798,7 +813,7 @@ function saveRem(){
 }
 
 /* ---------- bu kişiye panelden atanmış hatırlatıcılar ---------- */
-let assignedCache=[],weatherCache={selected:false,off:false},contactMsgs=[],contactUnread=0;
+let assignedCache=[],weatherCache={selected:false,off:false,am:true,pm:false},contactMsgs=[],contactUnread=0;
 async function assignedCall(extra){
   if(!PUSH_OK()||!S.settings.push) return null;
   try{
@@ -912,16 +927,33 @@ function courseBlock(m){
 
 /* ---------- doktor randevuları ---------- */
 const upcomingAppts=()=>{const t=today(); return (S.appts||[]).filter(a=>a.date>=t).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));};
-const relDay=d=>{const n=diff(d,today()); return n===0?'Bugün':n===1?'Yarın':`${n} gün sonra`;};
+const relDay=d=>{const n=diff(d,today()); return n===0?'Bugün':n===1?'Yarın':n>1?`${n} gün kaldı`:`${-n} gün önce`;};
+const pastAppts=()=>{const t=today(); return (S.appts||[]).filter(a=>a.date<t).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));};
 function apptRemTxt(a){
   const r=[]; if(a.w1!==false) r.push('1 hafta'); if(a.d3!==false) r.push('3 gün'); if(a.d1) r.push('1 gün'); if(a.h2) r.push('2 saat');
   return r.length?'Hatırlatma: '+r.join(', ')+' önce':'Hatırlatma yok';
 }
+function apptRow(a,past){
+  const n=diff(a.date,today());
+  const big=past?`<b>${-n}</b><span>gün önce</span>`:(n===0?'<b>Bugün</b><span></span>':n===1?'<b>Yarın</b><span>1 gün</span>':`<b>${n}</b><span>gün kaldı</span>`);
+  return `<button class="appt${past?' past':''}" data-a="editAppt" data-id="${a.id}"><div class="adays">${big}</div><div class="ainfo"><b>${esc(a.title)}</b><span>${short(a.date)} ${GUN_UZUN[parse(a.date).getDay()]}, ${a.time}${a.place?', '+esc(a.place):''}</span>${past?'':`<span class="arem">${apptRemTxt(a)}</span>`}</div></button>`;
+}
 function apptSection(){
   const list=upcomingAppts();
   return `<h3>Doktor randevu takip</h3>
-  ${list.map(a=>`<button class="appt" data-a="editAppt" data-id="${a.id}"><b>${esc(a.title)}</b><span>${relDay(a.date)}, ${short(a.date)} ${a.time}${a.place?', '+esc(a.place):''}</span><span style="display:block;font-size:13px">${apptRemTxt(a)}</span></button>`).join('')||'<div class="empty"><p>Yaklaşan randevu yok. Doktordan aldığın randevuyu yaz, tarihi yaklaşırken haber vereyim.</p></div>'}
-  <button class="btn ghost sm" style="margin-top:6px" data-a="newAppt">Randevu ekle</button>
+  ${list.slice(0,3).map(a=>apptRow(a)).join('')||'<div class="empty"><p>Yaklaşan randevu yok. Doktordan aldığın randevuyu yaz, tarihi yaklaşırken haber vereyim.</p></div>'}
+  ${list.length>3?`<p class="fine" style="margin:0 0 6px">ve ${list.length-3} randevu daha</p>`:''}
+  <div class="row2" style="gap:8px;margin-top:6px"><button class="btn ghost sm" data-a="newAppt">Randevu ekle</button><button class="btn ghost sm" data-a="tab" data-t="appt">Tüm randevular</button></div>
+  ${S.settings.push?'':'<p class="fine">Hatırlatma bildirimi için Ayarlar\'dan arka plan bildirimlerini aç.</p>'}`;
+}
+function renderAppt(){
+  const up=upcomingAppts(), past=pastAppts(), nx=up[0];
+  const big=nx?(()=>{ const n=diff(nx.date,today()); return `<div class="apptbig"><div class="abn">${n===0?'Bugün':n===1?'Yarın':n}</div><div><b>${n>1?'gün kaldı':'Sıradaki randevu'}</b><span>${esc(nx.title)}</span><span>${short(nx.date)} ${GUN_UZUN[parse(nx.date).getDay()]}, ${nx.time}${nx.place?', '+esc(nx.place):''}</span></div></div>`; })():'';
+  return `<div class="head"><div><h1>Doktor Randevu Takip</h1><div class="sub">Randevunu yaz, gününe kaç gün kaldığını gör</div></div><button class="btn teal" data-a="newAppt">Ekle</button></div>
+  ${big}
+  <h3>Yaklaşan randevular</h3>
+  ${up.map(a=>apptRow(a)).join('')||'<div class="empty"><p>Yaklaşan randevu yok. Doktordan randevu aldığında buraya yaz, 1 hafta, 3 gün ve 1 gün kala haber vereyim.</p><button class="btn teal" data-a="newAppt">Randevu ekle</button></div>'}
+  ${past.length?`<h3>Geçmiş randevular</h3>${past.slice(0,15).map(a=>apptRow(a,true)).join('')}<p class="fine">Geçmiş randevular 90 gün saklanır.</p>`:''}
   ${S.settings.push?'':'<p class="fine">Hatırlatma bildirimi için Ayarlar\'dan arka plan bildirimlerini aç.</p>'}`;
 }
 function openAppt(){ $('#sheet').innerHTML=sheetAppt(); $('#sheetwrap').classList.add('open'); }
@@ -929,7 +961,7 @@ function sheetAppt(){
   const d=adraft;
   return `<div class="grab"></div><h2>${d.id?'Randevuyu düzenle':'Yeni randevu'}</h2>
   <label>Doktor ya da bölüm<input id="a-title" maxlength="80" value="${esc(d.title)}" placeholder="Örn. Dahiliye, Dr. Ayşe" autocomplete="off"></label>
-  <div class="two"><label>Tarih<input type="date" id="a-date" min="${today()}" value="${d.date}"></label><label>Saat<input type="time" id="a-time" value="${d.time}"></label></div>
+  <div class="two"><label>Tarih<input type="date" id="a-date" ${d.id&&d.date<today()?'':`min="${today()}"`} value="${d.date}"></label><label>Saat<input type="time" id="a-time" value="${d.time}"></label></div>
   <label>Yer (isteğe bağlı)<input id="a-place" maxlength="80" value="${esc(d.place)}" placeholder="Örn. Şehir Hastanesi" autocomplete="off"></label>
   <div class="lbl">Hatırlat</div>
   <div class="chips" style="margin-top:0"><button class="chip v ${d.w1?'on':''}" data-a="aptTog" data-k="w1">1 hafta önce, 10:00</button><button class="chip v ${d.d3?'on':''}" data-a="aptTog" data-k="d3">3 gün önce, 10:00</button><button class="chip v ${d.d1?'on':''}" data-a="aptTog" data-k="d1">1 gün önce, 18:00</button><button class="chip v ${d.h2?'on':''}" data-a="aptTog" data-k="h2">2 saat önce</button></div>
@@ -941,7 +973,7 @@ function saveAppt(){
   syncAppt(); const d=adraft, title=d.title.trim();
   if(!title) return toast('Doktor ya da bölümü yaz');
   if(!d.date) return toast('Tarihi seç');
-  if(d.date<today()) return toast('Geçmiş bir tarih seçemezsin');
+  if(d.date<today()&&!(d.id&&(S.appts||[]).some(x=>x.id===d.id&&x.date===d.date))) return toast('Geçmiş bir tarih seçemezsin');
   if(!d.time) return toast('Saati seç');
   S.appts=S.appts||[];
   const obj={id:d.id||'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),title:title.slice(0,80),date:d.date,time:d.time,place:d.place.trim().slice(0,80),w1:!!d.w1,d3:!!d.d3,d1:!!d.d1,h2:!!d.h2};
@@ -963,6 +995,11 @@ function wxApply(d){
   const a=document.activeElement;
   if(tab==='home'&&!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'))&&!$('#sheetwrap').classList.contains('open')) render();
 }
+let wxSel=-1;
+function wxDetail(d){
+  if(d.na) return 'Bu günün tahmini henüz yok.';
+  return `${long(d.date)}: ${esc(d.cond)}, ${d.low}° / ${d.high}°.${d.wet?' Şemsiye al.':(d.pop!=null&&d.pop>=50?` Yağış ihtimali %${d.pop}.`:'')}${d.wind!=null?` Rüzgar ${d.wind} km/sa${d.windy?' (rüzgarlı)':''}.`:''}${d.humMin!=null?` Nem %${d.humMin}-${d.humMax}.`:''}`;
+}
 function wxCard(){
   if(!wxData||!wxData.week) return wxErr?'<div class="wxcard"><span class="sub">Hava durumu şu an alınamıyor</span></div>':'';
   const w=wxData.week,n=wxData.now;
@@ -970,8 +1007,13 @@ function wxCard(){
   const src=!srcs.length?'':srcs.length===1?(srcs[0]==='MGM'?'MGM':'Open-Meteo'):'MGM, Open-Meteo';
   const top=n?`<div class="wxtop"><span class="wxbig">${n.icon||''}</span><div><b>Bugün ${esc(n.cond)}, ${n.low}° / ${n.high}°</b><span>${n.wet?'Şemsiye al. ':''}${n.wind!=null?`Rüzgar ${n.wind} km/sa${n.windy?' 💨':''}`:''}${n.humMin!=null?`, nem %${n.humMin}-${n.humMax}`:''}</span></div></div>`
     :'<div class="wxtop"><div><b>Bugünün tahmini alınamadı</b></div></div>';
-  const cells=w.map(d=>`<div class="wxd${d.today?' today':''}${d.past?' past':''}"><b>${d.label}</b><span class="wxi">${d.na?'–':d.icon}</span><span class="wxh">${d.na?'':d.high+'°'}</span></div>`).join('');
-  return `<div class="wxcard">${top}<div class="wxrow">${cells}</div><div class="wxfoot">İstanbul${wxData.monday>wxData.today?', gelecek hafta':''}${src?', kaynak '+src:''}</div></div>`;
+  const cells=w.map((d,k)=>{
+    const dt=parse(d.date), lab=GUNLER[(dt.getDay()+6)%7];
+    return `<button class="wxd${d.today?' today':''}${wxSel===k?' sel':''}" data-a="wxDay" data-i="${k}" aria-pressed="${wxSel===k}" aria-label="${long(d.date)}"><b>${lab}</b><small>${short(d.date)}</small><span class="wxi">${d.na?'–':d.icon}</span><span class="wxh">${d.na?'':d.high+'°'}</span></button>`;
+  }).join('');
+  const det=(wxSel>=0&&w[wxSel])?`<div class="wxdet">${wxDetail(w[wxSel])}</div>`:'';
+  const first=w[0]&&w[0].date>wxData.today;
+  return `<div class="wxcard">${top}<div class="wxrow">${cells}</div>${det}<div class="wxfoot">İstanbul${first?', gelecek hafta':''}${src?', kaynak '+src:''}</div></div>`;
 }
 
 /* ---------- kaçırılan bildirimler: simge rozeti ve uygulama içi kart ---------- */
@@ -999,6 +1041,13 @@ async function inboxLoad(){
   inboxList=list;
   const a=document.activeElement;
   if(!same&&tab==='home'&&!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'))&&!$('#sheetwrap').classList.contains('open')) render();
+}
+async function inboxAdd(msgs){
+  const b=await inboxRead(), have=new Set((b.items||[]).map(i=>i.tag));
+  const add=msgs.map(m=>({ts:m.ts||Date.now(),title:m.title||'Düzen',body:m.body||'',url:m.url||'/',tag:'silent-'+(m.id||m.ts),read:false})).filter(i=>!have.has(i.tag));
+  if(!add.length) return;
+  b.items=[...add,...(b.items||[])].sort((x,y)=>y.ts-x.ts).slice(0,50);
+  await inboxWrite(b); await inboxLoad();
 }
 async function inboxMark(all,ts){
   const b=await inboxRead(); (b.items||[]).forEach(i=>{ if(all||i.ts===ts) i.read=true; });
@@ -1092,6 +1141,7 @@ document.addEventListener('click',e=>{
       if(delArm!=='inbox'){ delArm='inbox'; renderHistory(); }
       else{ (async()=>{ const b=await inboxRead(); b.items=[]; b.badge=0; await inboxWrite(b); histItems=[]; histNew=new Set(); inboxList=[]; delArm=''; renderHistory(); toast('Geçmiş temizlendi'); })(); }
       break;
+    case 'wxDay': wxSel=(wxSel===+D.i?-1:+D.i); render(); break;
     case 'inboxClear': inboxMark(true); break;
     case 'inboxOpen': { const i=inboxList[+D.i]; if(i){ const u=i.url; inboxMark(false,i.ts).then(()=>handleNav(u)); } break; }
     case 'aClose': closeAlert(); break;
@@ -1151,7 +1201,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ hiddenAt
 (async function init(){
   const d=await store.load();
   if(d) S={...S,...d,settings:{...S.settings,...(d.settings||{})}};
-  if((S.appts||[]).some(a=>a.date<addDays(today(),-1))){ S.appts=S.appts.filter(a=>a.date>=addDays(today(),-1)); persist(); }
+  if((S.appts||[]).some(a=>a.date<addDays(today(),-90))){ S.appts=S.appts.filter(a=>a.date>=addDays(today(),-90)); persist(); }
   applyTheme(); try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(S.settings.theme==='system') applyTheme(); }); }catch(e){}
   wxLoadCache(); render(); tick(); setInterval(tick,15000); inboxLoad(); setTimeout(maybeAskName,700);
   if('serviceWorker' in navigator&&location.protocol==='https:'){ navigator.serviceWorker.register('/sw.js').catch(()=>{}); if(S.settings.push) pushSync();

@@ -66,7 +66,7 @@ export default async (req) => {
 
     let notified = false;
     const sub = await s.get("sub/" + pid, { type: "json" });
-    if (sub) {
+    if (sub && b.notify !== false) {
       const v = await vapid(s);
       const subject = (process.env.URL || "").startsWith("https://") ? process.env.URL : "mailto:push@example.com";
       webpush.setVapidDetails(subject, v.publicKey, v.privateKey);

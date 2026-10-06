@@ -27,7 +27,7 @@ export default async (req) => {
   }
   return Response.json({
     items: list.map(({ id, text, time, days, off }) => ({ id, text, time, days, off: !!off })),
-    weather: { selected: !!wr, off: !!(wr && wr.off) },
+    weather: { selected: !!wr, off: !!(wr && wr.off), card: wr ? wr.card !== false : false, am: wr ? wr.am !== false : false, pm: !!(wr && wr.pm === true) },
   });
 };
 

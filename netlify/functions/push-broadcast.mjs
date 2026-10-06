@@ -33,9 +33,26 @@ export default async (req) => {
   const bid = "b" + Date.now().toString(36);
   const url = `/?t=${encodeURIComponent(title)}&b=${encodeURIComponent(body)}&n=${bid}`;
   const payload = JSON.stringify({ title, body, tag: "duyuru-" + Date.now(), url });
-  const important = b.important === true;
+  const silent = b.silent === true;                 // sessiz: bildirim gitmez, kişi uygulamayı açınca görür
+  const important = b.important === true && !silent;
   const okPids = [];
   let sent = 0, failed = 0, removed = 0;
+
+  if (silent) {
+    let queued = 0;
+    for (const { key } of blobs) {
+      const pid = key.slice(4);
+      if (!(await s.get(key, { type: "json" }))) continue;
+      const q = (await s.get("qmsg/" + pid, { type: "json" })) || [];
+      q.push({ id: bid + pid.slice(0, 4), bid, ts: Date.now(), title, body, url });
+      await s.setJSON("qmsg/" + pid, q.slice(-20));
+      okPids.push(pid); queued++;
+    }
+    if (okPids.length) {
+      await s.setJSON("bc/" + bid, { id: bid, title, body: body.slice(0, 100), sentAt: Date.now(), important: false, silent: true, to: okPids, opened: {} });
+    }
+    return Response.json({ ok: true, total: blobs.length, sent: 0, queued, failed: 0, removed: 0, important: false, silent: true });
+  }
 
   for (let i = 0; i < blobs.length; i += 20) {
     await Promise.all(blobs.slice(i, i + 20).map(async ({ key }) => {

@@ -52,6 +52,12 @@ button:disabled{opacity:.6}
 .row .del{margin:8px 0 0;width:auto;padding:6px 14px;font-size:13px;background:transparent;border:1.5px solid #E7B9B5;color:#B3261E}
 .row.warn{background:#FBE9DC}
 .row.bad{background:#F9DCE6}
+.cx{margin:0;width:auto;padding:6px 11px;border-radius:999px;font-size:13px;font-weight:650;background:#fff;border:1.5px solid #E4E0EE;color:#1F1B33}
+.cx.on{background:#0F7F7E;border-color:#0F7F7E;color:#fff}
+.cols{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.wxr{display:block}
+.wxr .cxs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+select{width:100%;margin-top:6px;padding:12px 14px;border:1.5px solid #E4E0EE;border-radius:12px;background:#fff;font:inherit;font-size:16px;color:inherit}
 .h3{font-size:15px;font-weight:700;color:#5E5A74;margin:18px 0 8px}
 .chk{display:flex;gap:10px;align-items:center;margin-top:14px;padding:11px 12px;background:#fff;border-radius:12px;font-weight:650;font-size:15px}
 .chk input{width:20px;height:20px;margin:0;flex:none}
@@ -89,6 +95,7 @@ button:disabled{opacity:.6}
   <label class="f">Başlık<input id="title" type="text" maxlength="80" placeholder="Örn. Yeni sürüm"></label>
   <label class="f">Mesaj<textarea id="body" maxlength="300" placeholder="Kısa ve net yaz"></textarea></label>
   <label class="chk"><input type="checkbox" id="imp">Önemli: 3 dk içinde açılmazsa bir kez daha gönder</label>
+  <label class="chk"><input type="checkbox" id="silent">Sessiz gönder: bildirim çıkmaz, kişi uygulamayı açınca zil geçmişinde görür</label>
   <button id="send">Gönder</button>
   <button id="stats" class="ghost">Kaç kişi kayıtlı?</button>
 </section>
@@ -102,6 +109,7 @@ button:disabled{opacity:.6}
   <label class="f">Saat<input id="atime" type="time" value="07:00"></label>
   <div class="f">Günler</div>
   <div class="days" id="adays"></div>
+  <label class="chk"><input type="checkbox" id="anotify">Kişiye "ayarlandı" bildirimi de gönder (işaretlemezsen bildirim gitmez, kişi Ayarlar'da görür)</label>
   <button id="asgBtn">Ata</button>
   <button id="showAsg" class="ghost">Atananları göster</button>
   <div id="assigned" style="margin-top:12px"></div>
@@ -115,6 +123,7 @@ button:disabled{opacity:.6}
     <div class="f" id="convName"></div>
     <div id="convMsgs" style="margin-top:8px"></div>
     <label class="f">Cevabın<textarea id="rtext" maxlength="500" placeholder="Cevabını yaz"></textarea></label>
+    <label class="chk"><input type="checkbox" id="rsilent">Bildirim gönderme (kişi cevabı sonra uygulamadan görür)</label>
     <button id="replyBtn">Cevapla</button>
     <button id="delThread" class="ghost">Yazışmayı sil</button>
     <button id="backList" class="ghost">Listeye dön</button>
@@ -147,16 +156,28 @@ button:disabled{opacity:.6}
 </section>
 
 <section id="p-wx" style="display:none">
-  <p class="hint">Her sabah 10:00'da İstanbul hava durumu, seçtiğin kişilere bildirim olarak gider. Veri Meteoroloji Genel Müdürlüğü'nden alınır, ulaşılamazsa Open-Meteo kullanılır ve mesajda kaynak yazar. Seçilen kişiye haber verilir, Ayarlar'dan kapatabilir.</p>
+  <p class="hint">Her kişi için ne alacağını seç: <b>Ana sayfa</b> (uygulamanın üstünde haftalık hava durumu kartı), <b>Sabah 10:00</b> (bugünün tahmini, bildirim) ve <b>Gece 23:00</b> (yarının tahmini, bildirim). Veri Meteoroloji Genel Müdürlüğü'nden alınır, ulaşılamazsa Open-Meteo kullanılır ve mesajda kaynak yazar. Seçilen kişiye haber verilir, Ayarlar'dan bildirimleri kapatabilir.</p>
   <button id="wxLoad" class="ghost" style="margin-top:6px">Kişileri getir</button>
-  <label class="chk" id="wxOnRow" style="display:none"><input type="checkbox" id="wxOn">Her sabah 10:00 gönderimi açık</label>
+  <label class="chk" id="wxOnRow" style="display:none"><input type="checkbox" id="wxOn">Her sabah 10:00 gönderimi açık (bugünün tahmini)</label>
+  <label class="chk" id="wxNightRow" style="display:none"><input type="checkbox" id="wxNightOn">Her gece 23:00 gönderimi açık (yarının tahmini)</label>
+  <div id="wxCols" class="cols" style="display:none">
+    <button type="button" class="cx" data-col="card">Ana sayfa: tümü</button>
+    <button type="button" class="cx" data-col="am">Sabah: tümü</button>
+    <button type="button" class="cx" data-col="pm">Gece: tümü</button>
+  </div>
   <div id="wxPeople" class="people"></div>
   <div id="wxBtns" style="display:none">
+    <label class="chk"><input type="checkbox" id="wxNotify">Yeni eklenen kişilere "ayarlandı" bildirimi de gönder (işaretlemezsen bildirim gitmez)</label>
     <button id="wxSave">Kaydet</button>
-    <button id="wxPrev" class="ghost">Önizleme (kimseye göndermeden)</button>
+    <button id="wxPrev" class="ghost">Önizleme: bugünün tahmini</button>
+    <button id="wxPrevT" class="ghost">Önizleme: yarının tahmini</button>
+    <label class="f">Deneme gönderimi
+      <select id="wxWhich"><option value="today">Bugünün tahmini (Sabah 10:00 işaretlilere)</option><option value="tomorrow">Yarının tahmini (Gece 23:00 işaretlilere)</option></select>
+    </label>
     <button id="wxNow" class="ghost">İşaretlilere şimdi gönder (deneme)</button>
   </div>
   <div id="wxLast" class="hint"></div>
+  <div id="wxLastN" class="hint"></div>
   <div id="wxMsg" class="row" style="display:none;white-space:pre-wrap;margin-top:10px"></div>
 </section>
 
@@ -210,20 +231,22 @@ document.querySelectorAll('input[name=to]').forEach(r=>r.onchange=async()=>{
   if(mode()==='all'){$('people').style.display='none';return;}
   try{await loadPeople($('people'));}catch(e){show('err',e.message);document.querySelector('input[name=to][value=all]').checked=true;$('people').style.display='none';}
 });
+$('silent').onchange=()=>{ if($('silent').checked){ $('imp').checked=false; $('imp').disabled=true; } else $('imp').disabled=false; };
 $('send').onclick=async()=>{
   const btn=$('send'); $('out').style.display='none';
   if(!$('secret').value||!$('title').value.trim()||!$('body').value.trim()) return show('err','Şifre, başlık ve mesajı doldur.');
-  const payload={title:$('title').value,body:$('body').value,important:$('imp').checked}; let ask='Bildirimi açan herkese gidecek. Göndereyim mi?';
+  const payload={title:$('title').value,body:$('body').value,important:$('imp').checked&&!$('silent').checked,silent:$('silent').checked}; let ask=$('silent').checked?'Bildirim GİTMEYECEK. Kişiler uygulamayı açınca zil geçmişinde görecek. Sessiz ileteyim mi?':'Bildirimi açan herkese gidecek. Göndereyim mi?';
   if(mode()==='sel'){
     const ids=[...document.querySelectorAll('#people input:checked')].map(i=>i.value);
     if(!ids.length) return show('err','En az bir kişi seç.');
-    payload.ids=ids; ask=ids.length+' kişiye gidecek. Göndereyim mi?';
+    payload.ids=ids; ask=ids.length+(' kişiye ')+($('silent').checked?'sessiz iletilecek (bildirim gitmez). Onaylıyor musun?':'gidecek. Göndereyim mi?');
   }
   if(!confirm(ask)) return;
   btn.disabled=true; btn.textContent='Gönderiliyor...';
   try{
     const d=await api('/api/push-broadcast',payload);
-    show('ok','Gönderildi: '+d.sent+' kişi'+(d.failed?', '+d.failed+' hata':'')+(d.removed?', '+d.removed+' geçersiz kayıt silindi':''));
+    if(d.silent) show('ok','Sessiz iletildi: '+d.queued+' kişi. Bildirim gitmedi, kişi uygulamayı açınca zil geçmişinde görecek.');
+    else show('ok','Gönderildi: '+d.sent+' kişi'+(d.failed?', '+d.failed+' hata':'')+(d.removed?', '+d.removed+' geçersiz kayıt silindi':''));
   }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
   btn.disabled=false; btn.textContent='Gönder';
 };
@@ -273,10 +296,10 @@ $('asgBtn').onclick=async()=>{
   if(!ids.length) return show('err','Önce kişileri getir ve en az birini seç.');
   const text=$('atext').value.trim(), time=$('atime').value, days=[...document.querySelectorAll('#adays .on')].map(b=>+b.dataset.i);
   if(!text||!time||!days.length) return show('err','Mesaj, saat ve en az bir gün gerekli.');
-  if(!confirm(ids.length+' kişiye tekrarlayan hatırlatıcı atanacak ve kendilerine haber verilecek. Atayayım mı?')) return;
+  if(!confirm(ids.length+' kişiye tekrarlayan hatırlatıcı atanacak'+($('anotify').checked?' ve kendilerine bildirimle haber verilecek':' (bildirim gitmeyecek)')+'. Atayayım mı?')) return;
   btn.disabled=true; btn.textContent='Atanıyor...';
   try{
-    const d=await api('/api/push-assign',{action:'add',ids,text,time,days});
+    const d=await api('/api/push-assign',{action:'add',ids,text,time,days,notify:$('anotify').checked});
     show('ok',d.count+' kişiye atandı'+(d.skipped?', '+d.skipped+' kişi atlandı (en fazla 10 hatırlatıcı ya da kayıt yok)':'')+'.');
     $('atext').value=''; await showAssigned();
   }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
@@ -317,8 +340,8 @@ $('replyBtn').onclick=async()=>{
   const text=$('rtext').value.trim(); if(!text) return show('err','Cevabı yaz.');
   const btn=$('replyBtn'); btn.disabled=true; btn.textContent='Gönderiliyor...';
   try{
-    const d=await api('/api/push-inbox',{action:'reply',pid:curPid,text});
-    show('ok',d.notified?'Cevap gönderildi, kişiye bildirim gitti.':'Cevap kaydedildi (kişiye bildirim gönderilemedi, uygulamayı açınca görür).');
+    const d=await api('/api/push-inbox',{action:'reply',pid:curPid,text,notify:!$('rsilent').checked});
+    show('ok',d.notified?'Cevap gönderildi, kişiye bildirim gitti.':($('rsilent').checked?'Cevap kaydedildi. Bildirim gitmedi, kişi uygulamadan görecek.':'Cevap kaydedildi (kişiye bildirim gönderilemedi, uygulamayı açınca görür).'));
     await openThread(curPid);
   }catch(e){show('err',e.message||'Sunucuya ulaşılamadı.');}
   btn.disabled=false; btn.textContent='Cevapla';
@@ -348,9 +371,9 @@ async function loadActivity(){
   if(!d.broadcasts.length) bl.appendChild(mk('p','sub','Henüz duyuru gönderilmedi.'));
   d.broadcasts.forEach(x=>{
     const r=mk('div','row'); const pct=x.sent?Math.round(x.opened/x.sent*100):0;
-    r.appendChild(mk('b',null,x.title+(x.important?' (önemli)':'')));
+    r.appendChild(mk('b',null,x.title+(x.important?' (önemli)':'')+(x.silent?' (sessiz)':'')));
     const bar=mk('div','bar'); const i=mk('i'); i.style.width=pct+'%'; bar.appendChild(i); r.appendChild(bar);
-    r.appendChild(mk('small',null,x.sent+' kişiye gitti, '+x.opened+' kişi açtı (%'+pct+'), '+ago2(x.sentAt)));
+    r.appendChild(mk('small',null,x.sent+(x.silent?' kişiye sessiz iletildi, ':' kişiye gitti, ')+''+x.opened+' kişi açtı (%'+pct+'), '+ago2(x.sentAt)));
     if(x.notOpenedNames.length) r.appendChild(mk('small',null,'Açmayanlar: '+x.notOpenedNames.join(', ')));
     if(x.openedNames.length) r.appendChild(mk('small',null,'Açanlar: '+x.openedNames.join(', ')));
     bl.appendChild(r);
@@ -414,45 +437,62 @@ $('refMed').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret
 document.querySelectorAll('input[name=mv]').forEach(r=>r.onchange=renderMeds);
 
 /* ---- Hava durumu bildirimi ---- */
-function wxLastText(l){
-  if(!l) return 'Henüz gönderim yok.';
-  const when=l.at?tfmt(l.at):'';
-  if(l.ok) return 'Son gönderim: '+when+', '+l.sent+' kişi, kaynak '+l.source+(l.note?' (MGM alınamadı, yedek kullanıldı)':'')+(l.failed?', '+l.failed+' hata':'');
-  return 'Son deneme başarısız ('+when+'): '+(l.error||'bilinmeyen hata')+'. 5 dakika sonra tekrar denenir.';
+function wxLastText(l,night){
+  if(!l) return (night?'Gece 23:00':'Sabah 10:00')+': henüz gönderim yok.';
+  const when=l.at?tfmt(l.at):'', lab=night?'Gece 23:00 (yarın: '+(l.forDate||'')+')':'Sabah 10:00';
+  if(l.ok) return lab+': son gönderim '+when+', '+l.sent+' kişi, kaynak '+l.source+(l.note?' (MGM alınamadı, yedek kullanıldı)':'')+(l.failed?', '+l.failed+' hata':'');
+  return lab+': son deneme başarısız ('+when+'): '+(l.error||'bilinmeyen hata')+'. 5 dakika sonra tekrar denenir.';
 }
 async function wxLoad(){
   const d=await api('/api/weather',{action:'get'});
   const box=$('wxPeople'); box.textContent=''; box.style.display='block';
-  $('wxOnRow').style.display='flex'; $('wxBtns').style.display='block'; $('wxOn').checked=!!d.enabled;
+  $('wxOnRow').style.display='flex'; $('wxNightRow').style.display='flex'; $('wxCols').style.display='flex'; $('wxBtns').style.display='block';
+  $('wxOn').checked=!!d.enabled; $('wxNightOn').checked=!!d.nightEnabled;
   if(!d.people.length){ box.appendChild(mk('p','sub','Kayıtlı kimse yok.')); }
   d.people.forEach(p=>{
-    const l=document.createElement('label'); l.className='p';
-    const c=document.createElement('input'); c.type='checkbox'; c.value=p.id; c.checked=!!p.selected;
-    const s=document.createElement('span'); s.append(mk('b',null,p.name||'İsimsiz'));
-    if(p.selected&&p.off) s.append(mk('small',null,'Kendisi kapattı'));
-    l.append(c,s); box.appendChild(l);
+    const row=document.createElement('div'); row.className='p wxr'; row.dataset.id=p.id;
+    const body=document.createElement('div'); body.append(mk('b',null,p.name||'İsimsiz'));
+    if(p.selected&&p.off) body.append(mk('small',null,'Bildirimleri kendisi kapattı'));
+    const cx=mk('div','cxs');
+    [['card','Ana sayfa'],['am','Sabah 10:00'],['pm','Gece 23:00']].forEach(([k,l])=>{
+      const b=mk('button','cx'+(p[k]?' on':''),l); b.type='button'; b.dataset.k=k; b.setAttribute('aria-pressed',p[k]?'true':'false');
+      b.onclick=()=>{ b.classList.toggle('on'); b.setAttribute('aria-pressed',b.classList.contains('on')?'true':'false'); };
+      cx.appendChild(b);
+    });
+    body.appendChild(cx); row.appendChild(body); box.appendChild(row);
   });
-  $('wxLast').textContent=wxLastText(d.last);
+  $('wxLast').textContent=wxLastText(d.last,false); $('wxLastN').textContent=wxLastText(d.lastNight,true);
 }
-const wxIds=()=>[...document.querySelectorAll('#wxPeople input:checked')].map(i=>i.value);
+const wxItems=()=>[...document.querySelectorAll('#wxPeople .wxr')].map(r=>({id:r.dataset.id,card:r.querySelector('[data-k=card]').classList.contains('on'),am:r.querySelector('[data-k=am]').classList.contains('on'),pm:r.querySelector('[data-k=pm]').classList.contains('on')}));
+const wxIdsFor=k=>wxItems().filter(x=>x[k]).map(x=>x.id);
 $('wxLoad').onclick=async()=>{ $('out').style.display='none'; try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz'); await wxLoad(); }catch(e){show('err',e.message);} };
+document.querySelectorAll('#wxCols [data-col]').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.col, chips=[...document.querySelectorAll('#wxPeople [data-k='+k+']')]; if(!chips.length) return;
+  const allOn=chips.every(c=>c.classList.contains('on'));
+  chips.forEach(c=>{ c.classList.toggle('on',!allOn); c.setAttribute('aria-pressed',!allOn?'true':'false'); });
+});
 $('wxSave').onclick=async()=>{
-  $('out').style.display='none'; const ids=wxIds();
-  if($('wxOn').checked&&!ids.length) return show('err','Gönderimi açmak için en az bir kişi seç.');
-  if(!confirm(ids.length+' kişi seçili, gönderim '+($('wxOn').checked?'AÇIK':'KAPALI')+'. Yeni eklenenlere haber verilecek. Kaydedeyim mi?')) return;
-  try{ const d=await api('/api/weather',{action:'save',ids,enabled:$('wxOn').checked}); show('ok','Kaydedildi: '+d.selected+' kişi'+(d.added?', '+d.added+' yeni kişiye haber verildi':'')+'.'); await wxLoad(); }catch(e){show('err',e.message);}
+  $('out').style.display='none'; const items=wxItems().filter(x=>x.card||x.am||x.pm);
+  const nAm=items.filter(x=>x.am).length, nPm=items.filter(x=>x.pm).length, nCard=items.filter(x=>x.card).length;
+  if($('wxOn').checked&&!nAm) return show('err','Sabah gönderimini açmak için en az bir kişiye "Sabah 10:00" seç.');
+  if($('wxNightOn').checked&&!nPm) return show('err','Gece gönderimini açmak için en az bir kişiye "Gece 23:00" seç.');
+  if(!confirm('Ana sayfa: '+nCard+' kişi. Sabah 10:00: '+nAm+' kişi ('+($('wxOn').checked?'AÇIK':'KAPALI')+'). Gece 23:00: '+nPm+' kişi ('+($('wxNightOn').checked?'AÇIK':'KAPALI')+'). '+($('wxNotify').checked?'Yeni bildirim türü eklenen kişilere bildirimle haber verilecek.':'Kimseye bildirim gitmeyecek.')+' Kaydedeyim mi?')) return;
+  try{ const d=await api('/api/weather',{action:'save',items,enabled:$('wxOn').checked,nightEnabled:$('wxNightOn').checked,notify:$('wxNotify').checked}); show('ok','Kaydedildi: '+d.selected+' kişi'+(d.notified?', '+d.notified+' kişiye haber verildi':', bildirim gitmedi')+'.'); await wxLoad(); }catch(e){show('err',e.message);}
 };
-$('wxPrev').onclick=async()=>{
+async function wxPreview(which){
   $('out').style.display='none';
   try{ if(!$('secret').value) throw new Error('Önce şifreyi yaz');
-    const d=await api('/api/weather',{action:'preview'}); const m=$('wxMsg'); m.style.display='block';
+    const d=await api('/api/weather',{action:'preview',which}); const m=$('wxMsg'); m.style.display='block';
     m.textContent=d.title+'\n'+d.body+'\n\n'+d.full+'\n\nKaynak: '+d.source+(d.note?' (MGM: '+d.note+')':'');
   }catch(e){show('err',e.message);}
-};
+}
+$('wxPrev').onclick=()=>wxPreview('today');
+$('wxPrevT').onclick=()=>wxPreview('tomorrow');
 $('wxNow').onclick=async()=>{
-  $('out').style.display='none'; const ids=wxIds(); if(!ids.length) return show('err','En az bir kişi işaretle.');
-  if(!confirm(ids.length+' kişiye hava durumu şimdi gönderilecek (deneme). Bugünkü 10:00 bildirimi yine de ayrıca gider. Göndereyim mi?')) return;
-  try{ const d=await api('/api/weather',{action:'sendnow',ids}); show('ok','Gönderildi: '+d.sent+' kişi, kaynak '+d.source+(d.failed?', '+d.failed+' hata':'')+'.'); }catch(e){show('err',e.message);}
+  $('out').style.display='none'; const which=$('wxWhich').value, ids=wxIdsFor(which==='tomorrow'?'pm':'am');
+  if(!ids.length) return show('err',(which==='tomorrow'?'Gece 23:00':'Sabah 10:00')+' seçili kimse yok.');
+  if(!confirm(ids.length+' kişiye '+(which==='tomorrow'?'yarının':'bugünün')+' hava durumu şimdi gönderilecek (deneme). Zamanlı bildirim yine de ayrıca gider. Göndereyim mi?')) return;
+  try{ const d=await api('/api/weather',{action:'sendnow',ids,which}); show('ok','Gönderildi: '+d.sent+' kişi, kaynak '+d.source+(d.failed?', '+d.failed+' hata':'')+'.'); }catch(e){show('err',e.message);}
 };
 
 /* ---- Bildirim günlüğü ---- */

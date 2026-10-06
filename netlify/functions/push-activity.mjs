@@ -96,7 +96,7 @@ export default async (req) => {
     if (!bc) continue;
     const opened = Object.keys(bc.opened || {});
     broadcasts.push({
-      id: bc.id, title: bc.title, body: bc.body, sentAt: bc.sentAt, important: !!bc.important,
+      id: bc.id, title: bc.title, body: bc.body, sentAt: bc.sentAt, important: !!bc.important, silent: !!bc.silent,
       sent: (bc.to || []).length, opened: opened.length,
       openedNames: opened.map((p) => names[p]).filter(Boolean),
       notOpenedNames: (bc.to || []).filter((p) => !(bc.opened || {})[p]).map((p) => names[p]).filter(Boolean),

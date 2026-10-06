@@ -125,6 +125,25 @@ export async function fetchOpenMeteo() {
   return { source: "Open-Meteo", ...t };
 }
 
+// offset 1 = yarın. MGM bugünden 5 gün verir; olmazsa Open-Meteo
+export async function getForecastFor(offset) {
+  if (!offset) return getForecast();
+  const today = localNow("Europe/Istanbul").date;
+  const target = addD(today, offset);
+  const errs = [];
+  try {
+    const x = (await fetchMGMDays()).find((d) => d.offset === offset);
+    if (x) return { source: "MGM", ...x, date: target };
+    errs.push("MGM: o günün tahmini yok");
+  } catch (e) { errs.push("MGM: " + (e && e.message)); }
+  try {
+    const x = (await fetchOMDays(0, offset + 1)).find((d) => d.date === target);
+    if (x) return { source: "Open-Meteo", ...x, note: errs.join("; ") };
+    errs.push("Open-Meteo: o günün tahmini yok");
+  } catch (e) { errs.push("Open-Meteo: " + (e && e.message)); }
+  throw new Error(errs.join(" | "));
+}
+
 export async function getForecast() {
   const errs = [];
   try { return await fetchMGM(); } catch (e) { errs.push("MGM: " + (e && e.message)); }
@@ -132,19 +151,23 @@ export async function getForecast() {
   throw new Error(errs.join(" | "));
 }
 
-// Ana sayfa için Pazartesi-Cuma haftası (Cumartesi/Pazar günleri gelecek haftanın Pzt-Cuma'sı)
+// Ana sayfa için kayan 5 iş günü: bugünden başlar (hafta sonuysa Pazartesi'den), gün geçtikçe kayar
 export async function getWeek() {
   const today = localNow("Europe/Istanbul").date;
   const dow = new Date(today + "T00:00:00Z").getUTCDay();   // 0 Pazar
-  const monday = addD(today, dow === 0 ? 1 : dow === 6 ? 2 : 1 - dow);
-  const targets = [0, 1, 2, 3, 4].map((i) => addD(monday, i));
+  const start = dow === 6 ? addD(today, 2) : dow === 0 ? addD(today, 1) : today;
+  const targets = [];
+  for (let d = start; targets.length < 5; d = addD(d, 1)) {
+    const w = new Date(d + "T00:00:00Z").getUTCDay();
+    if (w !== 0 && w !== 6) targets.push(d);
+  }
   const errs = [];
   let mgm = null, om = null;
   try { mgm = await fetchMGMDays(); } catch (e) { errs.push("MGM: " + (e && e.message)); }
   const by = {};
   if (mgm) mgm.forEach((x) => { by[addD(today, x.offset)] = { ...x, src: "MGM" }; });
-  if ([...targets, today].some((d) => !by[d])) {          // geçmiş günler ve MGM'nin 5 gününü aşanlar için
-    try { om = await fetchOMDays(); } catch (e) { errs.push("Open-Meteo: " + (e && e.message)); }
+  if ([...targets, today].some((d) => !by[d])) {          // MGM'nin 5 gününü aşan günler için
+    try { om = await fetchOMDays(0, 10); } catch (e) { errs.push("Open-Meteo: " + (e && e.message)); }
   }
   const omBy = {};
   (om || []).forEach((x) => { omBy[x.date] = { ...x, src: "Open-Meteo" }; });
@@ -155,12 +178,13 @@ export async function getWeek() {
     icon: x.icon, cond: x.cond, low: x.low, high: x.high, wind: x.wind, wet: x.wet,
     windy: x.wind != null && x.wind >= WINDY, humMin: x.humMin, humMax: x.humMax, pop: x.pop, src: x.src,
   });
-  const week = targets.map((d, i) => {
+  const week = targets.map((d) => {
     const x = pick(d);
-    return { date: d, label: labels[i], today: d === today, past: d < today, na: !x, ...(x ? view(x) : {}) };
+    const w = new Date(d + "T00:00:00Z").getUTCDay();
+    return { date: d, label: labels[w - 1], today: d === today, past: false, na: !x, ...(x ? view(x) : {}) };
   });
   const t = pick(today);
-  return { today, monday, week, now: t ? view(t) : null, note: errs.join("; ") };
+  return { today, monday: start, week, now: t ? view(t) : null, note: errs.join("; ") };
 }
 
 // Haftalık tahmin: bir saat önbellekte tutulur (herkes her açışında MGM'yi yormasın)
@@ -178,9 +202,14 @@ export async function getWeekCached(s) {
   }
 }
 
-export function buildMessage(f) {
+export function buildMessage(f, opts = {}) {
   let day = "";
-  try { day = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "numeric", month: "long", weekday: "long" }).format(new Date()); } catch { /* tarih yazılmaz */ }
+  try {
+    day = opts.tomorrow && f.date
+      ? new Intl.DateTimeFormat("tr-TR", { timeZone: "UTC", day: "numeric", month: "long", weekday: "long" }).format(new Date(f.date + "T00:00:00Z"))
+      : new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "numeric", month: "long", weekday: "long" }).format(new Date());
+  } catch { /* tarih yazılmaz */ }
+  if (opts.tomorrow) return buildTomorrow(f, day);
   const src = f.source === "MGM" ? "Meteoroloji Genel Müdürlüğü" : "Open-Meteo";
   const hint = f.wet ? "Şemsiye almayı unutma." : (f.pop != null && f.pop >= 50 ? `Yağış ihtimali %${f.pop}.` : "");
   const body = `${f.cond}, ${f.low}° / ${f.high}°.${hint ? " " + hint : ""}${f.wind != null ? ` Rüzgar ${f.wind} km/sa.` : ""} (${f.source})`;
@@ -193,6 +222,21 @@ export function buildMessage(f) {
     `Kaynak: ${src}`,
   ].filter(Boolean);
   return { title: "İstanbul hava durumu", body, full: lines.join("\n") };
+}
+
+function buildTomorrow(f, day) {
+  const src = f.source === "MGM" ? "Meteoroloji Genel Müdürlüğü" : "Open-Meteo";
+  const hint = f.wet ? "Şemsiyeni hazırla." : (f.pop != null && f.pop >= 50 ? `Yağış ihtimali %${f.pop}.` : "");
+  const body = `${day ? day + ": " : ""}${f.cond}, ${f.low}° / ${f.high}°.${hint ? " " + hint : ""}${f.wind != null ? ` Rüzgar ${f.wind} km/sa.` : ""} (${f.source})`;
+  const lines = [
+    `İstanbul, ${day || "yarın"} (yarın)`, f.cond,
+    `En düşük ${f.low}°, en yüksek ${f.high}°`,
+    f.humMin != null && f.humMax != null ? `Nem %${f.humMin} - %${f.humMax}` : null,
+    f.wind != null ? `Rüzgar ${f.wind} km/sa` : null,
+    hint || null,
+    `Kaynak: ${src}`,
+  ].filter(Boolean);
+  return { title: "Yarının hava durumu, İstanbul", body, full: lines.join("\n") };
 }
 
 export async function setupVapid(s) {
@@ -225,5 +269,5 @@ export const weatherPayload = (m) => ({
 
 export async function loadCfg(s) {
   const c = (await s.get("weather", { type: "json" })) || {};
-  return { enabled: !!c.enabled, recipients: c.recipients || {}, last: c.last || null };
+  return { enabled: !!c.enabled, nightEnabled: !!c.nightEnabled, recipients: c.recipients || {}, last: c.last || null, lastNight: c.lastNight || null };
 }
