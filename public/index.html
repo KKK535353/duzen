@@ -177,16 +177,24 @@ input[type=file]{display:none}
 .apptbig span{display:block;font-size:14px;color:var(--ink2)}
 .wxcard{background:var(--surf);border-radius:16px;padding:10px 12px 8px;margin:0 0 14px;box-shadow:0 1px 0 var(--line)}
 .wxtop{display:flex;gap:10px;align-items:center}
-.wxbig{font-size:30px;line-height:1}
+.wxbig{font-size:30px;line-height:1;background:transparent;border:0;padding:0;color:inherit;font-family:inherit;cursor:pointer;flex:none;-webkit-tap-highlight-color:transparent}
+.wxbig.k-sun{animation:fxpulse 3.2s ease-in-out infinite}
+.wxbig.k-rain,.wxbig.k-storm{animation:fxbob 1.6s ease-in-out infinite}
+.wxbig.k-snow{animation:fxsway 3.6s ease-in-out infinite}
+.wxbig.k-wind{animation:fxshift 2s ease-in-out infinite}
+.wxbig.k-cloud,.wxbig.k-part{animation:fxshift 5s ease-in-out infinite}
+.wxcard.nofx .wxbig{animation:none}
 .wxtop b{display:block;font-size:15px}
 .wxtop span{font-size:13px;color:var(--ink2)}
-.wxrow{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:8px}
+.wxrow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:8px}
 .wxd{padding:4px 0;text-align:center;border-radius:10px;display:flex;flex-direction:column;align-items:center;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer}
 .wxd b{font-size:12px;color:var(--ink2)}
 .wxd small{font-size:10.5px;color:var(--ink2);line-height:1.1}
 .wxd .wxi{font-size:20px;line-height:1.3}
 .wxd .wxh{font-size:13px;font-weight:800}
 .wxd.today{background:var(--teal-soft)}
+.wxd.we b{color:var(--violet)}
+@media (max-width:360px){.wxd small{font-size:9.5px}.wxd .wxh{font-size:12px}}
 .wxd.sel{outline:2px solid var(--violet)}
 .wxdet{margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--violet-soft);font-size:13.5px}
 .wxfoot{font-size:11.5px;color:var(--ink2);margin-top:5px}
@@ -220,6 +228,36 @@ input[type=file]{display:none}
 @keyframes dgrow{from{width:0}}
 @keyframes dshine{0%{transform:translateX(-120%)}65%,100%{transform:translateX(120%)}}
 @keyframes dpulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.22)}}
+/* hava efektleri: ekranın üstünden geçer, dokunmayı engellemez */
+.fx{position:fixed;inset:0;z-index:10;pointer-events:none;overflow:hidden;animation:fxio var(--ms,3.8s) ease-in-out both}
+.fx i,.fx u,.fx b{position:absolute;display:block;pointer-events:none;will-change:transform}
+.fx-rain i,.fx-storm i{top:-40px;width:2px;border-radius:2px;background:linear-gradient(to bottom,rgba(110,168,242,0),#4F93EE);animation:fxrain linear infinite}
+html[data-theme="dark"] .fx-rain i,html[data-theme="dark"] .fx-storm i{background:linear-gradient(to bottom,rgba(150,195,250,0),#9CC4F8)}
+.fx-storm .fl{inset:0;background:rgba(255,255,255,.7);opacity:0;animation:fxflash 2.4s ease-out infinite}
+.fx-snow i{top:-14px;border-radius:50%;background:#fff;box-shadow:0 0 0 .6px rgba(110,150,205,.6),0 0 5px rgba(110,150,205,.55);animation:fxsnow linear infinite}
+.fx-wind i{left:-240px;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#6E7FA3 55%,transparent);animation:fxwind linear infinite}
+html[data-theme="dark"] .fx-wind i{background:linear-gradient(90deg,transparent,#C9D6F2 55%,transparent)}
+.fx-wind u{left:-24px;width:11px;height:7px;border-radius:0 100% 0 100%;animation:fxleaf linear infinite}
+.fx-sun .g,.fx-part .g{right:-24vmax;top:-24vmax;width:62vmax;height:62vmax;border-radius:50%;background:radial-gradient(circle,rgba(255,214,90,.6),rgba(255,200,70,.2) 40%,rgba(255,200,70,0) 66%)}
+.fx-sun .r,.fx-part .r{right:-75vmax;top:-75vmax;width:150vmax;height:150vmax;border-radius:50%;background:repeating-conic-gradient(rgba(255,184,0,.4) 0 4deg,rgba(255,184,0,0) 4deg 15deg);-webkit-mask-image:radial-gradient(circle,#000 0,#000 6%,transparent 46%);mask-image:radial-gradient(circle,#000 0,#000 6%,transparent 46%);animation:fxspin 10s linear infinite}
+.fx-part .g,.fx-part .r{opacity:.6}
+.fx .c{left:0;width:110px;height:32px;border-radius:32px;background:rgb(168,182,212);opacity:.5;animation:fxcloud linear infinite}
+.fx .c::before,.fx .c::after{content:"";position:absolute;border-radius:50%;background:inherit}
+.fx .c::before{left:16px;top:-17px;width:46px;height:46px}
+.fx .c::after{left:46px;top:-27px;width:58px;height:58px}
+html[data-theme="dark"] .fx .c{background:rgb(112,126,160);opacity:.55}
+@keyframes fxio{0%{opacity:0}12%{opacity:1}80%{opacity:1}100%{opacity:0}}
+@keyframes fxrain{from{transform:translate3d(0,0,0) rotate(12deg)}to{transform:translate3d(-26vh,118vh,0) rotate(12deg)}}
+@keyframes fxflash{0%,100%{opacity:0}6%{opacity:.85}11%{opacity:0}17%{opacity:.5}24%{opacity:0}}
+@keyframes fxsnow{0%{transform:translate3d(0,0,0)}50%{transform:translate3d(var(--dx,30px),56vh,0)}100%{transform:translate3d(calc(var(--dx,30px) * -.5),112vh,0)}}
+@keyframes fxwind{0%{transform:translate3d(0,0,0)}50%{transform:translate3d(65vw,-10px,0)}100%{transform:translate3d(140vw,7px,0)}}
+@keyframes fxleaf{0%{transform:translate3d(0,0,0) rotate(0)}50%{transform:translate3d(60vw,var(--dy,-30px),0) rotate(360deg)}100%{transform:translate3d(118vw,calc(var(--dy,-30px) * -.6),0) rotate(740deg)}}
+@keyframes fxspin{to{transform:rotate(360deg)}}
+@keyframes fxcloud{from{transform:translate3d(-300px,0,0) scale(var(--s,1.4))}to{transform:translate3d(115vw,0,0) scale(var(--s,1.4))}}
+@keyframes fxpulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(255,190,40,0))}50%{transform:scale(1.08);filter:drop-shadow(0 0 7px rgba(255,190,40,.85))}}
+@keyframes fxbob{0%,100%{transform:translateY(-1px)}50%{transform:translateY(2px)}}
+@keyframes fxsway{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+@keyframes fxshift{0%,100%{transform:translateX(-2px)}50%{transform:translateX(3px)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -576,6 +614,7 @@ function renderSet(){
   <div class="chips" style="margin-top:0">${[['light','Açık'],['dark','Koyu'],['system','Telefonu izle'],['auto','Saate göre']].map(([v,l])=>`<button class="chip v ${(s.theme||'light')===v?'on':''}" data-a="theme" data-v="${v}">${l}</button>`).join('')}</div>
   ${(s.theme||'light')==='auto'?`<div class="two" style="margin-top:4px"><label>Koyu mod başlangıcı<input type="time" id="th-from" value="${s.themeFrom||'20:00'}"></label><label>Bitişi<input type="time" id="th-to" value="${s.themeTo||'07:00'}"></label></div>`:''}
   <p class="fine">${(s.theme||'light')==='system'?'Telefonunun açık ya da koyu ayarını izler. ':(s.theme||'light')==='auto'?'Seçtiğin saatler arasında kendiliğinden koyu olur. ':''}Şu an ${document.documentElement.getAttribute('data-theme')==='dark'?'koyu':'açık'} görünüm kullanılıyor.</p>
+  ${wxData?`<div class="set row2"><div><b>Hava durumu animasyonları</b><small>${fxReduced()?'Telefonunda “Hareketi azalt” açık olduğu için animasyon görünmez.':'Güneş, yağmur, kar ve rüzgâr efektleri; simgeye dokununca ya da uygulamayı açınca oynar.'}</small></div><button class="sw t ${s.fxOff?'':'on'}" data-a="fxTgl" role="switch" aria-checked="${!s.fxOff}" aria-label="Hava durumu animasyonları"></button></div>`:''}
   <h3>Gizlilik</h3>
   <div class="set row2"><div><b>İlaç listemi paylaş</b><small>${s.push?'Açarsan ilaç adların, dozların ve saatlerin duyuru gönderen kişiye görünür. Kapatınca görünmez olur. Kapalıyken de sana ne zaman bildirim gönderildiği ve bildirime dokunup dokunmadığın (ilaç adı olmadan) duyuru gönderen kişiye görünür. Hatırlatma bildirimleri için bu bilgiler zaten sunucuda tutulur.':'Önce arka plan bildirimlerini aç.'}</small></div>${s.push?`<button class="sw t ${s.shareMeds?'on':''}" data-a="tgl" data-k="shareMeds" role="switch" aria-checked="${!!s.shareMeds}" aria-label="İlaç listemi paylaş"></button>`:''}</div>
   <h3>Veriler</h3>
@@ -1001,7 +1040,7 @@ function saveAppt(){
 let wxData=null,wxAt=0,wxErr=false,wxAsked=0;
 const wxNeed=()=>S.settings.push&&Date.now()-wxAsked>20*60000;
 function wxLoadCache(){
-  try{ const c=JSON.parse(localStorage.getItem('duzen:wx')||'null'); if(c&&c.data&&c.data.today===today()){ wxData=c.data; wxAt=c.at||0; } }catch(e){}
+  try{ const c=JSON.parse(localStorage.getItem('duzen:wx')||'null'); if(c&&c.data&&c.data.v===2&&c.data.today===today()){ wxData=c.data; wxAt=c.at||0; } }catch(e){}
 }
 function wxApply(d){
   if(d&&d.weather&&d.weather.week){ wxData=d.weather; wxAt=Date.now(); wxErr=false; try{localStorage.setItem('duzen:wx',JSON.stringify({data:wxData,at:wxAt}));}catch(e){} }
@@ -1010,6 +1049,7 @@ function wxApply(d){
   else return;
   const a=document.activeElement;
   if(tab==='home'&&!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'))&&!$('#sheetwrap').classList.contains('open')) render();
+  wxAuto();
 }
 let wxSel=-1;
 function wxDetail(d){
@@ -1021,15 +1061,71 @@ function wxCard(){
   const w=wxData.week,n=wxData.now;
   const srcs=[...new Set([...w.filter(d=>!d.na).map(d=>d.src),n&&n.src].filter(Boolean))];
   const src=!srcs.length?'':srcs.length===1?(srcs[0]==='MGM'?'MGM':'Open-Meteo'):'MGM, Open-Meteo';
-  const top=n?`<div class="wxtop"><span class="wxbig">${n.icon||''}</span><div><b>Bugün ${esc(n.cond)}, ${n.low}° / ${n.high}°</b><span>${n.wet?'Şemsiye al. ':''}${n.wind!=null?`Rüzgar ${n.wind} km/sa${n.windy?' 💨':''}`:''}${n.humMin!=null?`, nem %${n.humMin}-${n.humMax}`:''}</span></div></div>`
+  const top=n?`<div class="wxtop"><button class="wxbig k-${fxKind(n)}" data-a="wxFx" aria-label="Hava efektini göster">${n.icon||''}</button><div><b>Bugün ${esc(n.cond)}, ${n.low}° / ${n.high}°</b><span>${n.wet?'Şemsiye al. ':''}${n.wind!=null?`Rüzgar ${n.wind} km/sa${n.windy?' 💨':''}`:''}${n.humMin!=null?`, nem %${n.humMin}-${n.humMax}`:''}</span></div></div>`
     :'<div class="wxtop"><div><b>Bugünün tahmini alınamadı</b></div></div>';
   const cells=w.map((d,k)=>{
     const dt=parse(d.date), lab=GUNLER[(dt.getDay()+6)%7];
-    return `<button class="wxd${d.today?' today':''}${wxSel===k?' sel':''}" data-a="wxDay" data-i="${k}" aria-pressed="${wxSel===k}" aria-label="${long(d.date)}"><b>${lab}</b><small>${short(d.date)}</small><span class="wxi">${d.na?'–':d.icon}</span><span class="wxh">${d.na?'':d.high+'°'}</span></button>`;
+    const we=dt.getDay()===0||dt.getDay()===6;
+    return `<button class="wxd${d.today?' today':''}${we?' we':''}${wxSel===k?' sel':''}" data-a="wxDay" data-i="${k}" aria-pressed="${wxSel===k}" aria-label="${long(d.date)}"><b>${lab}</b><small>${short(d.date)}</small><span class="wxi">${d.na?'–':d.icon}</span><span class="wxh">${d.na?'':d.high+'°'}</span></button>`;
   }).join('');
   const det=(wxSel>=0&&w[wxSel])?`<div class="wxdet">${wxDetail(w[wxSel])}</div>`:'';
   const first=w[0]&&w[0].date>wxData.today;
-  return `<div class="wxcard">${top}<div class="wxrow">${cells}</div>${det}<div class="wxfoot">İstanbul${first?', gelecek hafta':''}${src?', kaynak '+src:''}</div></div>`;
+  return `<div class="wxcard${S.settings.fxOff?' nofx':''}">${top}<div class="wxrow" style="grid-template-columns:repeat(${w.length||7},1fr)">${cells}</div>${det}<div class="wxfoot">İstanbul${first?', gelecek hafta':''}${src?', kaynak '+src:''}</div></div>`;
+}
+
+/* ---------- hava efektleri: simgeye dokununca ya da uygulama açılınca ekranın üstünden geçer ---------- */
+const fxReduced=()=>{ try{ return !!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(e){ return false; } };
+function fxKind(d){
+  if(!d||d.na) return '';
+  const c=String(d.cond||'').toLocaleLowerCase('tr'), ic=d.icon||'';
+  if(/gök gürültülü/.test(c)||ic==='⛈️') return 'storm';
+  if(/kar|dolu/.test(c)) return 'snow';
+  if(d.wet||/yağmur|yağış|sağanak/.test(c)) return 'rain';
+  if(d.windy||/rüzgar/.test(c)||ic==='💨'||ic==='🌪️') return 'wind';
+  if(/parçalı/.test(c)||ic==='⛅') return 'part';
+  if(/^(açık|az bulutlu|sıcak)/.test(c)||ic==='☀️'||ic==='🌤️') return 'sun';
+  if(/bulut|sis|pus|duman/.test(c)||ic==='☁️'||ic==='🌫️') return 'cloud';
+  return '';
+}
+let fxTimer=0;
+function fxStop(){ clearTimeout(fxTimer); const o=document.getElementById('fx'); if(o) o.remove(); }
+function fxPlay(kind){
+  fxStop();
+  if(!kind||S.settings.fxOff||fxReduced()) return false;
+  const rnd=(a,b)=>a+Math.random()*(b-a), f1=x=>x.toFixed(1), f2=x=>x.toFixed(2);
+  const many=(k,fn)=>{ let h=''; for(let i=0;i<k;i++) h+=fn(i); return h; };
+  let h='', ms=3800;
+  if(kind==='rain'||kind==='storm'){
+    h=many(90,()=>`<i style="left:${f1(rnd(-5,125))}%;height:${Math.round(rnd(16,34))}px;opacity:${f2(rnd(.5,.95))};animation-duration:${f2(rnd(.55,.95))}s;animation-delay:-${f2(rnd(0,1))}s"></i>`);
+    if(kind==='storm') h+='<b class="fl"></b>';
+  }else if(kind==='snow'){
+    ms=5200;
+    h=many(60,()=>{ const z=rnd(4,10); return `<i style="left:${f1(rnd(0,100))}%;width:${f1(z)}px;height:${f1(z)}px;opacity:${f2(rnd(.7,1))};--dx:${Math.round(rnd(-45,45))}px;animation-duration:${f2(rnd(3.4,5.4))}s;animation-delay:-${f2(rnd(0,4))}s"></i>`; });
+  }else if(kind==='wind'){
+    const lc=['#8DBB5A','#C9A24B','#6FA35A','#D9893A'];
+    h=many(20,()=>`<i style="top:${f1(rnd(3,94))}%;width:${Math.round(rnd(100,230))}px;opacity:${f2(rnd(.55,.95))};animation-duration:${f2(rnd(.9,1.7))}s;animation-delay:-${f2(rnd(0,1.5))}s"></i>`)
+     +many(10,(i)=>`<u style="top:${f1(rnd(10,85))}%;background:${lc[i%4]};--dy:${Math.round(rnd(-60,60))}px;animation-duration:${f2(rnd(1.5,2.6))}s;animation-delay:-${f2(rnd(0,2))}s"></u>`);
+  }else if(kind==='sun'||kind==='part'){
+    ms=3600; h='<b class="g"></b><b class="r"></b>';
+    if(kind==='part') h+=many(3,()=>`<i class="c" style="top:${f1(rnd(3,50))}%;--s:${f2(rnd(.9,1.5))};animation-duration:${f2(rnd(7,11))}s;animation-delay:-${f2(rnd(0,7))}s"></i>`);
+  }else if(kind==='cloud'){
+    ms=4600;
+    h=many(6,()=>`<i class="c" style="top:${f1(rnd(2,80))}%;--s:${f2(rnd(1,1.9))};animation-duration:${f2(rnd(6,11))}s;animation-delay:-${f2(rnd(0,7))}s"></i>`);
+  }else return false;
+  const o=document.createElement('div');
+  o.id='fx'; o.className='fx fx-'+kind; o.setAttribute('aria-hidden','true'); o.style.setProperty('--ms',(ms/1000)+'s'); o.innerHTML=h;
+  document.body.appendChild(o);
+  fxTimer=setTimeout(fxStop,ms+150);
+  return true;
+}
+let fxAuto=false;
+function wxAuto(){
+  if(fxAuto||!wxData||!wxData.now||tab!=='home'||S.settings.fxOff) return;
+  fxAuto=true;
+  setTimeout(()=>{
+    if(tab!=='home'||document.hidden||$('#sheetwrap').classList.contains('open')||$('#alert').classList.contains('open')){ fxAuto=false; return; }
+    fxPlay(fxKind(wxData&&wxData.now));
+  },900);
 }
 
 /* ---------- kaçırılan bildirimler: simge rozeti ve uygulama içi kart ---------- */
@@ -1193,7 +1289,9 @@ document.addEventListener('click',e=>{
       if(delArm!=='inbox'){ delArm='inbox'; renderHistory(); }
       else{ (async()=>{ const b=await inboxRead(); b.items=[]; b.badge=0; await inboxWrite(b); histItems=[]; histNew=new Set(); inboxList=[]; delArm=''; renderHistory(); toast('Geçmiş temizlendi'); })(); }
       break;
-    case 'wxDay': wxSel=(wxSel===+D.i?-1:+D.i); render(); break;
+    case 'wxDay': wxSel=(wxSel===+D.i?-1:+D.i); render(); if(wxSel>=0&&wxData&&wxData.week) fxPlay(fxKind(wxData.week[wxSel])); break;
+    case 'wxFx': fxPlay(fxKind(wxData&&wxData.now)); break;
+    case 'fxTgl': S.settings.fxOff=!S.settings.fxOff; if(S.settings.fxOff) fxStop(); persist(); render(); break;
     case 'inboxClear': inboxMark(true); break;
     case 'inboxOpen': { const i=inboxList[+D.i]; if(i){ const u=i.url; inboxMark(false,i.ts).then(()=>handleNav(u)); } break; }
     case 'aClose': closeAlert(); break;
@@ -1247,7 +1345,7 @@ document.addEventListener('change',e=>{
   }
 });
 let hiddenAt=0;
-document.addEventListener('visibilitychange',()=>{ if(document.hidden){ hiddenAt=Date.now(); return; } inboxLoad(); tick(); if(S.settings.push){ if(hiddenAt&&Date.now()-hiddenAt>300000) track({type:'open'}); else pushSync(); } });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ hiddenAt=Date.now(); fxStop(); return; } if(hiddenAt&&Date.now()-hiddenAt>20*60000){ fxAuto=false; wxAuto(); } inboxLoad(); tick(); if(S.settings.push){ if(hiddenAt&&Date.now()-hiddenAt>300000) track({type:'open'}); else pushSync(); } });
 
 /* ---------- başlat ---------- */
 (async function init(){
@@ -1255,7 +1353,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ hiddenAt
   if(d) S={...S,...d,settings:{...S.settings,...(d.settings||{})}};
   if((S.appts||[]).some(a=>a.date<addDays(today(),-90))){ S.appts=S.appts.filter(a=>a.date>=addDays(today(),-90)); persist(); }
   applyTheme(); try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(S.settings.theme==='system') applyTheme(); }); }catch(e){}
-  wxLoadCache(); render(); tick(); setInterval(tick,15000); inboxLoad(); setTimeout(maybeAskName,700);
+  wxLoadCache(); render(); wxAuto(); tick(); setInterval(tick,15000); inboxLoad(); setTimeout(maybeAskName,700);
   if('serviceWorker' in navigator&&location.protocol==='https:'){ navigator.serviceWorker.register('/sw.js').catch(()=>{}); if(S.settings.push) pushSync();
     navigator.serviceWorker.addEventListener('message',e=>{ if(e.data&&e.data.type==='nav') handleNav(e.data.url); else if(e.data&&e.data.type==='resub') renewSub(); else if(e.data&&e.data.type==='inbox') inboxLoad(); });
   }

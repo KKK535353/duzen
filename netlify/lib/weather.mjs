@@ -151,29 +151,24 @@ export async function getForecast() {
   throw new Error(errs.join(" | "));
 }
 
-// Ana sayfa için kayan 5 iş günü: bugünden başlar (hafta sonuysa Pazartesi'den), gün geçtikçe kayar
+// Ana sayfa için kayan 7 gün: bugünden başlar, hafta sonu dahil.
+// MGM bugünden 5 gün verir (bugün + 4); geri kalan günler Open-Meteo'dan alınır.
 export async function getWeek() {
   const today = localNow("Europe/Istanbul").date;
-  const dow = new Date(today + "T00:00:00Z").getUTCDay();   // 0 Pazar
-  const start = dow === 6 ? addD(today, 2) : dow === 0 ? addD(today, 1) : today;
-  const targets = [];
-  for (let d = start; targets.length < 5; d = addD(d, 1)) {
-    const w = new Date(d + "T00:00:00Z").getUTCDay();
-    if (w !== 0 && w !== 6) targets.push(d);
-  }
+  const targets = Array.from({ length: 7 }, (_, i) => addD(today, i));
   const errs = [];
   let mgm = null, om = null;
   try { mgm = await fetchMGMDays(); } catch (e) { errs.push("MGM: " + (e && e.message)); }
   const by = {};
   if (mgm) mgm.forEach((x) => { by[addD(today, x.offset)] = { ...x, src: "MGM" }; });
-  if ([...targets, today].some((d) => !by[d])) {          // MGM'nin 5 gününü aşan günler için
+  if (targets.some((d) => !by[d])) {                      // MGM'nin 5 gününü aşan (veya eksik) günler
     try { om = await fetchOMDays(0, 10); } catch (e) { errs.push("Open-Meteo: " + (e && e.message)); }
   }
   const omBy = {};
   (om || []).forEach((x) => { omBy[x.date] = { ...x, src: "Open-Meteo" }; });
   if (!mgm && !om) throw new Error(errs.join(" | "));
   const pick = (d) => by[d] || omBy[d] || null;
-  const labels = ["Pzt", "Sal", "Çar", "Per", "Cum"];
+  const labels = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
   const view = (x) => ({
     icon: x.icon, cond: x.cond, low: x.low, high: x.high, wind: x.wind, wet: x.wet,
     windy: x.wind != null && x.wind >= WINDY, humMin: x.humMin, humMax: x.humMax, pop: x.pop, src: x.src,
@@ -181,23 +176,23 @@ export async function getWeek() {
   const week = targets.map((d) => {
     const x = pick(d);
     const w = new Date(d + "T00:00:00Z").getUTCDay();
-    return { date: d, label: labels[w - 1], today: d === today, past: false, na: !x, ...(x ? view(x) : {}) };
+    return { date: d, label: labels[w], weekend: w === 0 || w === 6, today: d === today, past: false, na: !x, ...(x ? view(x) : {}) };
   });
   const t = pick(today);
-  return { today, monday: start, week, now: t ? view(t) : null, note: errs.join("; ") };
+  return { v: 2, today, monday: today, week, now: t ? view(t) : null, note: errs.join("; ") };
 }
 
 // Haftalık tahmin: bir saat önbellekte tutulur (herkes her açışında MGM'yi yormasın)
 export async function getWeekCached(s) {
   const today = localNow("Europe/Istanbul").date;
   const cache = await s.get("wxweek", { type: "json" });
-  if (cache && cache.data && cache.data.today === today && Date.now() - cache.ts < 3600000) return { ...cache.data, cached: true };
+  if (cache && cache.data && cache.data.v === 2 && cache.data.today === today && Date.now() - cache.ts < 3600000) return { ...cache.data, cached: true };
   try {
     const data = await getWeek();
     await s.setJSON("wxweek", { ts: Date.now(), data });
     return data;
   } catch (e) {
-    if (cache && cache.data) return { ...cache.data, stale: true };
+    if (cache && cache.data && cache.data.v === 2) return { ...cache.data, stale: true };
     throw e;
   }
 }
