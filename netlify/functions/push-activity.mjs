@@ -21,6 +21,101 @@ export default async (req) => {
   const now = Date.now();
   const today = fmtDate(now);
 
+  // Sıradaki bildirimler: önümüzdeki 24 saatte kime, ne zaman, nasıl bir bildirim gidecek
+  if (b.upcoming === true) {
+    const HORIZON = 1440;
+    const addDay = (d, n) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+    const dDiff = (a, c) => Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(c + "T00:00:00Z")) / 864e5);
+    const minuteStart = Math.floor(now / 60000) * 60000;
+    const cfg = (await s.get("weather", { type: "json" })) || {};
+    const L0 = localNow("Europe/Istanbul");
+    const items = [];
+    const put = (inMin, kind, who, title, detail, note) => {
+      if (inMin < 0 || inMin > HORIZON) return;
+      items.push({ at: minuteStart + inMin * 60000, inMin, kind, who, title, detail: detail || "", note: note || "" });
+    };
+    const trDate = (d) => { try { return new Intl.DateTimeFormat("tr-TR", { timeZone: "UTC", day: "numeric", month: "long", weekday: "long" }).format(new Date(d + "T00:00:00Z")); } catch { return d; } };
+    for (const { key } of (await s.list({ prefix: "sub/" })).blobs) {
+      const rec = await s.get(key, { type: "json" });
+      if (!rec) continue;
+      const pid = key.slice(4);
+      const who = full(rec) || ("İsimsiz (" + pid.slice(0, 4) + ")");
+      const share = rec.shareMeds === true;               // ilaç adı ve kişisel metinler yalnızca paylaşan kişide görünür
+      const L = localNow(rec.tz);
+      const done = new Set(rec.done || []), sentK = rec.sent || {};
+      const mins = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+      // 1) İlaç saatleri
+      for (const m of rec.meds || []) {
+        for (const k of [0, 1]) {
+          const date = addDay(L.date, k), wd = (L.wd + k) % 7;
+          if (date < m.start || (m.end && date > m.end) || !(m.days || []).includes(wd)) continue;
+          for (const t of m.times || []) {
+            const slot = `${date}|${m.id}|${t}`;
+            if (k === 0 && (done.has(slot) || sentK[slot + "|1"])) continue;
+            put(k * 1440 + mins(t) - L.min, "ilac", who,
+              share ? "İlaç vakti: " + m.name : "İlaç vakti bildirimi",
+              share ? (m.dose ? `${t}, ${m.dose}` : `${t}, dozunu almayı unutma`) : `Saat ${t}`,
+              "İşaretlenmezse 5 dakika sonra bir kez daha hatırlatılır");
+          }
+        }
+      }
+      // 2) Kişinin kendi günlük hatırlatıcıları
+      for (const r of rec.rem || []) {
+        for (const k of [0, 1]) {
+          if (!(r.days || []).includes((L.wd + k) % 7)) continue;
+          if (k === 0 && sentK[`${L.date}|r:${r.id}|${r.time}|1`]) continue;
+          put(k * 1440 + mins(r.time) - L.min, "hatirlatma", who, share ? r.text : "Günlük hatırlatıcı (kişinin kendi hatırlatıcısı)", `Saat ${r.time}`);
+        }
+      }
+      // 3) Panelden atanan hatırlatıcılar
+      for (const r of (await s.get("assigned/" + pid, { type: "json" })) || []) {
+        if (r.off) continue;
+        for (const k of [0, 1]) {
+          if (!(r.days || []).includes((L.wd + k) % 7)) continue;
+          if (k === 0 && sentK[`${L.date}|a:${r.id}|${r.time}|1`]) continue;
+          put(k * 1440 + mins(r.time) - L.min, "atanan", who, r.text, `Saat ${r.time}`, "Sen atadın");
+        }
+      }
+      // 4) Doktor randevusu hatırlatmaları
+      for (const a of rec.appts || []) {
+        const am = mins(a.time);
+        const evs = [];
+        if (a.w1 !== false) evs.push(["w1", addDay(a.date, -7), 600, "1 hafta kaldı"]);
+        if (a.d3 !== false) evs.push(["d3", addDay(a.date, -3), 600, "3 gün kaldı"]);
+        if (a.d1) evs.push(["d1", addDay(a.date, -1), 1080, "yarın"]);
+        if (a.h2) evs.push(["h2", a.date, am - 120, "2 saat kaldı"]);
+        for (const [kk, date, min, lab] of evs) {
+          if (sentK[`${date}|p:${a.id}|${kk}`]) continue;
+          put(dDiff(date, L.date) * 1440 + min - L.min, "randevu", who,
+            share ? `Doktor randevusu (${lab}): ${a.title}` : `Doktor randevusu hatırlatması (${lab})`,
+            `${trDate(a.date)}, saat ${a.time}`);
+        }
+      }
+      // 5) Hava durumu (İstanbul saatiyle 10:00 ve 23:00)
+      const wr = cfg.recipients && cfg.recipients[pid];
+      if (wr && !wr.off) {
+        const wxPut = (min, titleTxt, doneToday) => {
+          for (const k of [0, 1]) {
+            if (k === 0 && doneToday) continue;
+            put(k * 1440 + min - L0.min, "hava", who, titleTxt, `Saat ${String(Math.floor(min / 60)).padStart(2, "0")}:00, Meteoroloji Genel Müdürlüğü`);
+          }
+        };
+        if (cfg.enabled && wr.am !== false) wxPut(600, "Bugünün hava durumu (İstanbul)", !!(cfg.last && cfg.last.date === L0.date && cfg.last.ok));
+        if (cfg.nightEnabled && wr.pm === true) wxPut(1380, "Yarının hava durumu (İstanbul)", !!(cfg.lastNight && cfg.lastNight.forDate === addDay(L0.date, 1) && cfg.lastNight.ok));
+      }
+    }
+    // 6) Önemli duyuruların "açılmadıysa tekrar" bildirimi
+    const pend = (await s.get("pending", { type: "json" })) || { items: [] };
+    const nameOf = {};
+    for (const { key } of (await s.list({ prefix: "sub/" })).blobs) { const r = await s.get(key, { type: "json" }); if (r) nameOf[key.slice(4)] = full(r) || "İsimsiz"; }
+    for (const it of pend.items) {
+      const inMin = Math.ceil((it.sentAt + 180000 - minuteStart) / 60000);
+      if (nameOf[it.pid] && inMin <= 10) put(Math.max(0, inMin), "duyuru2", nameOf[it.pid], "Tekrar: " + it.title, "Açılmadıysa bir kez daha gönderilir");
+    }
+    items.sort((a, c) => a.at - c.at || a.who.localeCompare(c.who, "tr"));
+    return Response.json({ ok: true, now, items: items.slice(0, 150), total: items.length });
+  }
+
   // Bildirim günlüğü: kime, ne zaman, ne gönderildi, gitti mi, dokundu mu
   if (b.log === true) {
     const OPEN_WINDOW = 30 * 60000;

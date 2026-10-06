@@ -17,13 +17,11 @@ export default async (req) => {
   try { b = await req.json(); } catch { return json({ error: "Bad JSON" }, 400); }
   if (!same(b.secret ?? "", secret)) return json({ error: "Şifre yanlış" }, 401);
 
-  if (b.action === "del") {
-    const pid = String(b.pid || "");
-    if (!PID.test(pid)) return json({ error: "Geçersiz kişi" }, 400);
-    const s = store();
+  const removePerson = async (s, pid) => {
     await s.delete("sub/" + pid);        // bildirim kaydı, ilaç listesi, hatırlatıcılar, etkinlik
     await s.delete("assigned/" + pid);   // panelden atanan hatırlatıcılar
     await s.delete("thread/" + pid);     // "Bize ulaşın" yazışması
+    await s.delete("qmsg/" + pid);       // teslim edilmemiş sessiz duyurular
     const pend = await s.get("pending", { type: "json" });
     if (pend && Array.isArray(pend.items)) {
       pend.items = pend.items.filter((i) => i.pid !== pid);
@@ -33,8 +31,24 @@ export default async (req) => {
     if (wcfg && wcfg.recipients && wcfg.recipients[pid]) { delete wcfg.recipients[pid]; await s.setJSON("weather", wcfg); }
     // Telefon bir sonraki açılışta kendiliğinden yeniden kayıt olmasın diye işaret bırak
     await s.setJSON("removed/" + pid, { ts: Date.now() });
+  };
+
+  if (b.action === "del") {
+    const pid = String(b.pid || "");
+    if (!PID.test(pid)) return json({ error: "Geçersiz kişi" }, 400);
+    await removePerson(store(), pid);
     return json({ ok: true });
   }
+
+  // Toplu silme: seçilenler ya da (panelde yazılı onayla) tümü
+  if (b.action === "delmany") {
+    const pids = [...new Set((Array.isArray(b.pids) ? b.pids : []).map(String).filter((x) => PID.test(x)))].slice(0, 300);
+    if (!pids.length) return json({ error: "Kimse seçilmedi" }, 400);
+    const s = store();
+    for (const pid of pids) await removePerson(s, pid);
+    return json({ ok: true, deleted: pids.length });
+  }
+
   return json({ error: "Bilinmeyen işlem" }, 400);
 };
 

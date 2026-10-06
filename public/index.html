@@ -206,6 +206,20 @@ input[type=file]{display:none}
 .hi .ht{font-size:13px;color:var(--ink2);min-width:42px;padding-top:2px;font-variant-numeric:tabular-nums}
 .hi b{display:block;font-size:14.5px}
 .hi span:not(.ht){display:block;font-size:13.5px;color:var(--ink2)}
+.dbar{margin:-2px 0 16px}
+.dtrack{position:relative;height:15px;border-radius:99px;background:var(--line);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.12)}
+.dfill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;overflow:hidden;transition:width 1.2s cubic-bezier(.2,.8,.2,1);background:linear-gradient(90deg,var(--ok),#7ADBA6)}
+.dfill::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.6) 50%,transparent 80%);transform:translateX(-120%);animation:dshine 2.4s ease-in-out infinite}
+.dbar.soon .dfill{background:linear-gradient(90deg,#E8A33A,#F6CF72)}
+.dbar.now .dfill{background:linear-gradient(90deg,var(--bad),#FF9A86);animation:dpulse 1.1s ease-in-out infinite}
+.dbar.now .dfill::after{animation-duration:1.2s}
+.dbar.enter .dfill{animation:dgrow 1.4s cubic-bezier(.2,.8,.2,1) both}
+.dbar.now.enter .dfill{animation:dgrow 1.4s cubic-bezier(.2,.8,.2,1) both,dpulse 1.1s ease-in-out 1.4s infinite}
+.dlab{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--ink2);margin-top:6px;font-variant-numeric:tabular-nums}
+.dlab .dl2{text-align:right;font-weight:650;color:var(--ink)}
+@keyframes dgrow{from{width:0}}
+@keyframes dshine{0%{transform:translateX(-120%)}65%,100%{transform:translateX(120%)}}
+@keyframes dpulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.22)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -457,6 +471,7 @@ function renderHome(){
     <svg class="ring" viewBox="0 0 84 84" aria-hidden="true"><circle class="bg" cx="42" cy="42" r="34"/><circle class="fg" cx="42" cy="42" r="34" transform="rotate(-90 42 42)" stroke-dasharray="${C}" stroke-dashoffset="${off}"/><text x="42" y="49">${taken}/${total}</text></svg>
     <div>${summary}</div>
   </div>
+  ${doseBarHTML()}
   ${low}
   ${total?`<h3>Bugünün dozları</h3><ul class="doses">${rows}</ul>`:`<div class="empty"><p>Henüz ilaç eklemedin.</p><button class="btn teal" data-a="newMed">İlaç ekle</button></div>`}
   ${courseHome}
@@ -651,6 +666,7 @@ function tick(){
     if(due){fired[t+due.key]=1; showAlert(due);}
   }
   if(nm!==lastRenderMin){ lastRenderMin=nm; if(tab==='home'&&!alertOpen&&!$('#sheetwrap').classList.contains('open')) render(); }
+  if(tab==='home') updateDoseBar();
 }
 
 /* ---------- dışa aktarım ---------- */
@@ -1091,13 +1107,49 @@ async function openHistory(){
   inboxList=[];
 }
 
+/* ---------- ilaç saati çubuğu ---------- */
+let barEnterUntil=0;
+function slotMs(date,t){ const [h,m]=t.split(':').map(Number); const d=parse(date); d.setHours(h,m,0,0); return d.getTime(); }
+function prevSlotMs(beforeMs){
+  const t0=today(); let best=null;
+  for(let i=0;i>=-7;i--){ const d=addDays(t0,i); for(const s of slotsFor(d)){ const ms=slotMs(d,s.t); if(ms<beforeMs&&(best===null||ms>best)) best=ms; } }
+  return best;
+}
+function doseBarInfo(){
+  if(!S.meds.length) return null;
+  const t=today(), nm=nowMin(), now=Date.now();
+  const late=slotsFor(t).filter(s=>!getLog(t,s.key)&&tmin(s.t)<nm);
+  if(late.length){                                    // geciken doz: çubuk dolu ve kırmızı
+    const s=late[0], m=nm-tmin(s.t), h=Math.floor(m/60);
+    return {mode:'now',pct:100,l1:`Gecikti: ${h?h+' sa ':''}${m%60} dk`,l2:`${s.t} ${s.m.name}`};
+  }
+  const nd=nextDose(); if(!nd) return null;
+  const nextMs=slotMs(nd.date,nd.s.t), prev=prevSlotMs(nextMs), start=prev!==null?prev:nextMs-864e5;
+  const pct=Math.max(2,Math.min(100,Math.round((now-start)/(nextMs-start)*100)));
+  const left=nextMs-now, st=new Date(start);
+  return {mode:left<=15*60000?'now':left<=60*60000?'soon':'ok',pct,l1:prev!==null?`${pad(st.getHours())}:${pad(st.getMinutes())}`:'',l2:`${nd.s.t} ${nd.s.m.name}`};
+}
+function doseBarHTML(){
+  const b=doseBarInfo(); if(!b) return '';
+  if(!barEnterUntil) barEnterUntil=Date.now()+2500;
+  const enter=Date.now()<barEnterUntil;
+  return `<div class="dbar ${b.mode}${enter?' enter':''}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${b.pct}" aria-label="Sıradaki ilaç saatine yaklaşma"><div class="dtrack"><i class="dfill" style="width:${b.pct}%"></i></div><div class="dlab"><span class="dl1">${esc(b.l1)}</span><span class="dl2">${esc(b.l2)}</span></div></div>`;
+}
+function updateDoseBar(){                              // sayfayı yeniden çizmeden, çubuğu yumuşakça ilerlet
+  const el=document.querySelector('.dbar'); if(!el||tab!=='home') return;
+  const b=doseBarInfo(); if(!b) return;
+  el.className='dbar '+b.mode+(Date.now()<barEnterUntil?' enter':''); el.setAttribute('aria-valuenow',b.pct);
+  el.querySelector('.dfill').style.width=b.pct+'%';
+  el.querySelector('.dl1').textContent=b.l1; el.querySelector('.dl2').textContent=b.l2;
+}
+
 /* ---------- olaylar ---------- */
 document.addEventListener('click',e=>{
   if(e.target.id==='sheetwrap'){closeSheet();return;}
   const el=e.target.closest('[data-a]'); if(!el) return;
   const a=el.dataset.a,D=el.dataset,t=today();
   switch(a){
-    case 'tab': tab=D.t; delArm=''; render(); $('#main').scrollTop=0; if(tab==='set'){ loadAssigned(); peekContact(); } break;
+    case 'tab': tab=D.t; delArm=''; if(tab==='home') barEnterUntil=Date.now()+2500; render(); $('#main').scrollTop=0; if(tab==='set'){ loadAssigned(); peekContact(); } break;
     case 'take': case 'skip': {
       const s=slotsFor(t).find(x=>x.key===D.k); if(s){setLog(t,s.key,a==='take'?'taken':'skipped',s.m); render();} break; }
     case 'undo': { const s=slotsFor(t).find(x=>x.key===D.k); if(s){setLog(t,s.key,null,s.m); render();} break; }
